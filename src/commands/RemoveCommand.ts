@@ -37,6 +37,14 @@ import path from 'path';
 
 export default class RemoveCommand extends Command {
     async run(ctx: CommandContext | any) {
+        if (!existsSync(path.join(__dirname, '../../dependencies/'))) await ctx.write({
+            embeds: [
+                new Embed()
+                .setColor(`#${process.env.PRIMARY}`)
+                .setDescription(`Error, la carpeta de dependencias no existe.`),
+            ]
+        });
+
         const dependencyName = ctx.options.repository;
         const dependencyType = ctx.options.dependencytype;
         const dependenciesPath = path.join(__dirname, '../../dependencies');

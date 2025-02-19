@@ -16,6 +16,8 @@ declare module 'seyfert' {
     extends ParseMiddlewares<typeof middlewares> {}
 }
 
+require('./api/main');
+
 process.on('unhandledRejection', async (err) => {
     console.error(err);
 });
