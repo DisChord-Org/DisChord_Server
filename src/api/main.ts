@@ -5,6 +5,8 @@ import fs from 'fs';
 const app = express();
 const PORT = 3000;
 
+app.use(express.json());
+
 app.get('/dependencies/find/:name', (req: any, res: any) => {
     const { name } = req.params;
 
@@ -31,7 +33,7 @@ app.get('/dependencies/find/:name', (req: any, res: any) => {
 
                 res.status(200).send({
                     path: dependencyPath,
-                    tpye: type,
+                    type: type,
                     versions: versionsSorted,
                     actualVersion: versionsSorted[versionsSorted.length - 1]
                 });
@@ -49,27 +51,52 @@ app.get('/dependencies/:type/:name/:version', (req: any, res: any) => {
     const { type, name, version } = req.params;
     const dependencyPath = path.join(__dirname, `../../dependencies/${type}/${name}/${version}/`);
 
-    if (!fs.existsSync(dependencyPath)) {
-        return res.status(404).json({ error: "Dependency not found" });
+    if (!fs.existsSync(dependencyPath)) return res.status(404).json({ error: "Dependency not found" });
+
+    const files: object[] = [];
+
+    function generateFileArray(route: string) {
+        const dependency = fs.readdirSync(route);
+
+        for (const file of dependency) {
+            if (file === '.git') continue;
+
+            const newRoute = path.join(route, file);
+
+            if (fs.statSync(newRoute).isDirectory()) {
+                files.push({
+                    name: file,
+                    type: 'folder',
+                    url: newRoute
+                });
+
+                generateFileArray(newRoute);
+            } else files.push({
+                name: file,
+                type: 'file',
+                url: newRoute
+            });
+        }
     }
 
-    const files = fs.readdirSync(dependencyPath).map(file => ({
-        name: file,
-        url: `http://localhost:${PORT}/download/${type}/${name}/${version}/${file}`
-    }));
+    generateFileArray(dependencyPath);
 
     res.json({ files });
 });
 
-app.get('/download/:type/:name/:version/:file', (req: any, res: any) => {
-    const { type, name, version, file } = req.params;
-    const filePath = path.join(__dirname, `../../dependencies/${type}/${name}/${version}/${file}`);
+app.post('/download', (req: any, res: any) => {
+    const { filePath } = req.body;
 
-    if (!fs.existsSync(filePath)) {
-        return res.status(404).send("File not found");
-    }
+    if (!filePath) return res.status(400).send("Se requiere un archivo en el cuerpo de la solicitud.");
 
-    res.download(filePath);
+    const safePath = path.normalize(filePath);
+
+    if (!safePath.startsWith(path.join(__dirname, '../../dependencies'))) return res.status(403).send("Forbidden: La ruta del archivo está fuera del directorio permitido.");
+
+    if (!fs.existsSync(safePath)) return res.status(404).send("File not found");
+    console.log('asd')
+
+    res.download(safePath);
 });
 
 app.listen(PORT, () => {
