@@ -154,12 +154,12 @@ export default class AddCommand extends Command {
 
                 function generateHashes(route: string) {
                     const src = readdirSync(route);
-                  
+
                     for (const file of src) {
                         if (file === '.git') continue;
-                  
+
                         const newRoute = path.join(route, file);
-                  
+
                         if (statSync(newRoute).isDirectory()) generateHashes(newRoute);
                         else {
                             const content = readFileSync(newRoute);
@@ -169,7 +169,7 @@ export default class AddCommand extends Command {
                     }
                 }
 
-                generateHashes(path.join(__dirname, `../../dependencies/${ctx.options.dependencytype}/${dependency.name}/${dependency.version}/src/`));
+                generateHashes(path.join(__dirname, ctx.options.dependencytype === 'unknown'? `../../dependencies/${ctx.options.dependencytype}/${dependency.name}/${dependency.version}/src/` : `../../dependencies/${ctx.options.dependencytype}/${dependency.name}/${dependency.version}/`));
 
                 const contentFile = Object.entries(hashes).map(([nombre, hash]) => `${hash}  ${nombre}`).join('\n');
 

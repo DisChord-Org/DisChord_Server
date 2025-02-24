@@ -19,28 +19,25 @@ app.get('/dependencies/find/:name', (req: any, res: any) => {
     for (const type of dependencyTypes) {
         const dependencyPath = path.join(__dirname, '../../dependencies/', type, name);
         if (fs.existsSync(dependencyPath)) {
+            const versions = fs.readdirSync(dependencyPath);
+            const versionsSorted = versions.sort((a, b) => {
+                const [aMajor, aMinor, aPatch] = a.split('.').map(Number);
+                const [bMajor, bMinor, bPatch] = b.split('.').map(Number);
 
-            if (fs.existsSync(dependencyPath)) {
-                const versions = fs.readdirSync(dependencyPath);
-                const versionsSorted = versions.sort((a, b) => {
-                    const [aMajor, aMinor, aPatch] = a.split('.').map(Number);
-                    const [bMajor, bMinor, bPatch] = b.split('.').map(Number);
-                
-                    if (aMajor !== bMajor) return aMajor - bMajor;
-                    if (aMinor !== bMinor) return aMinor - bMinor;
-                    return aPatch - bPatch;
-                });                
+                if (aMajor !== bMajor) return aMajor - bMajor;
+                if (aMinor !== bMinor) return aMinor - bMinor;
+                return aPatch - bPatch;
+            });
 
-                res.status(200).send({
-                    path: dependencyPath,
-                    type: type,
-                    versions: versionsSorted,
-                    actualVersion: versionsSorted[versionsSorted.length - 1]
-                });
+            res.status(200).send({
+                path: dependencyPath,
+                type: type,
+                versions: versionsSorted,
+                actualVersion: versionsSorted[versionsSorted.length - 1]
+            });
 
-                found = true;
-                break;
-            }
+            found = true;
+            break;
         }
     }
 
@@ -94,7 +91,6 @@ app.post('/download', (req: any, res: any) => {
     if (!safePath.startsWith(path.join(__dirname, '../../dependencies'))) return res.status(403).send("Forbidden: La ruta del archivo está fuera del directorio permitido.");
 
     if (!fs.existsSync(safePath)) return res.status(404).send("File not found");
-    console.log('asd')
 
     res.download(safePath);
 });
