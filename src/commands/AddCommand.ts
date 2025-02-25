@@ -2,9 +2,12 @@ import { Declare, Command, type CommandContext, Options, createStringOption, cre
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
-import axios from 'axios';
 import { createHash } from 'crypto';
 import openpgp from 'openpgp';
+
+function isValidVersion(version: string): boolean {
+    return /^v\d+\.\d+\.\d+$/.test(version);
+}
 
 @Declare({
     name: 'add',
@@ -14,7 +17,7 @@ import openpgp from 'openpgp';
 
 @Options({
     repository: createStringOption({
-        description: 'Repository URL',
+        description: 'Repository URL with version branch (e.g.: https://github.com/user/repo/tree/v1.0.0)',
         required: true
     }),
 
@@ -64,10 +67,27 @@ export default class AddCommand extends Command {
         if (!existsSync(path.join(__dirname, '../../dependencies/trust/'))) mkdirSync(path.join(__dirname, '../../dependencies/trust/'));
         if (!existsSync(path.join(__dirname, '../../dependencies/unknown/'))) mkdirSync(path.join(__dirname, '../../dependencies/unknown/'));
 
+        const urlParts = ctx.options.repository.split('/');
+        const treeIndex = urlParts.indexOf('tree');
+
+        let branch = 'main';
+        let cleanUrl = ctx.options.repository;
+
+        if (treeIndex > -1) {
+            branch = urlParts[treeIndex + 1];
+            cleanUrl = urlParts.slice(0, treeIndex).join('/');
+        }
+
+        const [,, owner, repo] = cleanUrl.split('/');
+
+        if (!owner || !repo) return await ctx.editResponse({
+            content: 'Formato de URL inválido. Debe ser: https://github.com/autor/repositorio'
+        });
+
         const dependency = {
-            name: ctx.options.repository.split('/').slice(-1)[0],
-            author: ctx.options.repository.split('/').slice(-2)[0],
-            version: undefined
+            name: repo.replace(/\.git$/, ''),
+            author: owner,
+            version: branch
         };
 
         await ctx.editResponse({
@@ -76,23 +96,29 @@ export default class AddCommand extends Command {
                 .setColor(`#${process.env.PRIMARY}`)
                 .setDescription(`
                     Agregando \`${ctx.options.repository}\` como \`${ctx.options.dependencytype}\`
-                    Obteniendo versión de \`${dependency.name}\`
+                    Validando versión de \`${dependency.name}\`
                 `)
             ]
         });
 
-        const response: any = await axios.get(`https://api.github.com/repos/${dependency.author}/${dependency.name}/contents/package.json`);
-
-        if (response.status === 200) {
-            const content = Buffer.from(response.data.content, 'base64').toString('utf-8');
-            dependency.version = JSON.parse(content).version;
-        } else return await ctx.editResponse({
+        if (!isValidVersion(dependency.version)) {
+            return await ctx.editResponse({
+                embeds: [
+                    new Embed()
+                    .setColor(`#${process.env.PRIMARY}`)
+                    .setDescription(`
+                        Agregando \`${ctx.options.repository}\` como \`${ctx.options.dependencytype}\`
+                        La rama **${dependency.version}** no es una versión válida (vX.X.X)
+                    `)
+                ]
+            });
+        } else await ctx.editResponse({
             embeds: [
                 new Embed()
                 .setColor(`#${process.env.PRIMARY}`)
                 .setDescription(`
                     Agregando \`${ctx.options.repository}\` como \`${ctx.options.dependencytype}\`
-                    Error al obtener la versión de \`${dependency.name}\`
+                    Versión actual obtenida \`${dependency.version}\`
                 `)
             ]
         });
@@ -110,7 +136,10 @@ export default class AddCommand extends Command {
         });
 
         if (!existsSync(path.join(__dirname, `../../dependencies/${ctx.options.dependencytype}/${dependency.name}`))) mkdirSync(path.join(__dirname, `../../dependencies/${ctx.options.dependencytype}/${dependency.name}`));
-        if (existsSync(path.join(__dirname, `../../dependencies/${ctx.options.dependencytype}/${dependency.name}/${dependency.version}/`))) return await ctx.editResponse({
+
+        const basePath = path.join(__dirname, `../../dependencies/${ctx.options.dependencytype}/${dependency.name}/${dependency.version}`);
+
+        if (existsSync(basePath)) return await ctx.editResponse({
             embeds: [
                 new Embed()
                 .setColor(`#${process.env.PRIMARY}`)
@@ -121,20 +150,25 @@ export default class AddCommand extends Command {
                 `)
             ]
         });
-        if (!existsSync(path.join(__dirname, `../../dependencies/${ctx.options.dependencytype}/${dependency.name}/${dependency.version}/`))) mkdirSync((path.join(__dirname, `../../dependencies/${ctx.options.dependencytype}/${dependency.name}/${dependency.version}/`)));
 
-        exec(`git clone ${ctx.options.repository} ${path.join(__dirname, `../../dependencies/${ctx.options.dependencytype}/${dependency.name}/${dependency.version}/src/`)}`, (async error => {
-            if (error) return await ctx.editResponse({
-                embeds: [
-                    new Embed()
-                    .setColor(`#${process.env.PRIMARY}`)
-                    .setDescription(`
-                        Agregando \`${ctx.options.repository}\` como \`${ctx.options.dependencytype}\`
-                        Versión actual obtenida \`${dependency.version}\`
-                        Error al clonar el repositorio
-                    `)
-                ]
-            });
+        mkdirSync(basePath, { recursive: true });
+
+        exec(`git clone --branch ${dependency.version} --single-branch ${cleanUrl} ${path.join(__dirname, `../../dependencies/${ctx.options.dependencytype}/${dependency.name}/${dependency.version}/src/`)}`, async error => {
+            if (error) {
+                if (error.message.includes('not found')) {
+                    return await ctx.editResponse({
+                        embeds: [
+                            new Embed()
+                            .setColor(`#${process.env.PRIMARY}`)
+                            .setDescription(`
+                                Agregando \`${ctx.options.repository}\` como \`${ctx.options.dependencytype}\`
+                                Versión actual obtenida \`${dependency.version}\`
+                                Error al clonar el repositorio
+                            `)
+                        ]
+                    });
+                }
+            }
 
             await ctx.editResponse({
                 embeds: [
@@ -256,7 +290,7 @@ export default class AddCommand extends Command {
             });
 
             writeFileSync(path.join(__dirname, `../../dependencies/${ctx.options.dependencytype}/${dependency.name}/${dependency.version}/version`), `${dependency.version}`);
-            writeFileSync(path.join(__dirname, `../../dependencies/${ctx.options.dependencytype}/${dependency.name}/${dependency.version}/repo`), `${ctx.options.repository}`);
+            writeFileSync(path.join(__dirname, `../../dependencies/${ctx.options.dependencytype}/${dependency.name}/${dependency.version}/repo`), `${cleanUrl}/tree/${dependency.version}`);
             writeFileSync(path.join(__dirname, `../../dependencies/${ctx.options.dependencytype}/${dependency.name}/${dependency.version}/author.json`), `${ctx.options.author.user}`);
 
             await ctx.editResponse({
@@ -326,6 +360,6 @@ export default class AddCommand extends Command {
                     ]
                 });
             }
-        }));
+        });
     }
 };
