@@ -85,7 +85,7 @@ export default class RemoveCommand extends Command {
                             embeds: [
                                 new Embed()
                                 .setColor(`#${process.env.PRIMARY}`)
-                                .setDescription(`La dependencia \`${dependencyName}\` no existe en \`${dependencyType}\`.`),
+                                .setDescription(`La dependencia \`${dependencyName}\` no existe en \`${type}\`.`),
                             ]
                         });
 
@@ -95,7 +95,7 @@ export default class RemoveCommand extends Command {
                             embeds: [
                                 new Embed()
                                 .setColor(`#${process.env.PRIMARY}`)
-                                .setDescription(`La dependencia \`${dependencyName}\` ha sido eliminada de \`${dependencyType}\`.`),
+                                .setDescription(`La dependencia \`${dependencyName}\` ha sido eliminada de \`${type}\`.`),
                             ]
                         });
 

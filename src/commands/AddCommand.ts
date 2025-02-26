@@ -78,7 +78,7 @@ export default class AddCommand extends Command {
             cleanUrl = urlParts.slice(0, treeIndex).join('/');
         }
 
-        const [,, owner, repo] = cleanUrl.split('/');
+        const [,,, owner, repo] = cleanUrl.split('/');
 
         if (!owner || !repo) return await ctx.editResponse({
             content: 'Formato de URL inválido. Debe ser: https://github.com/autor/repositorio'
@@ -291,7 +291,7 @@ export default class AddCommand extends Command {
 
             writeFileSync(path.join(__dirname, `../../dependencies/${ctx.options.dependencytype}/${dependency.name}/${dependency.version}/version`), `${dependency.version}`);
             writeFileSync(path.join(__dirname, `../../dependencies/${ctx.options.dependencytype}/${dependency.name}/${dependency.version}/repo`), `${cleanUrl}/tree/${dependency.version}`);
-            writeFileSync(path.join(__dirname, `../../dependencies/${ctx.options.dependencytype}/${dependency.name}/${dependency.version}/author.json`), `${ctx.options.author.user}`);
+            writeFileSync(path.join(__dirname, `../../dependencies/${ctx.options.dependencytype}/${dependency.name}/${dependency.version}/author.json`), `${JSON.stringify({ id: ctx.options.author.user.id, username: ctx.options.author.user.username, globalName: ctx.options.author.user.globalName, avatar: ctx.options.author.user.avatar})}`);
 
             await ctx.editResponse({
                 embeds: [
