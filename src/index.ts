@@ -1,4 +1,4 @@
-require('./api/main');
+import './api/main';
 
 process.on('unhandledRejection', async (err) => {
     console.error(err);
