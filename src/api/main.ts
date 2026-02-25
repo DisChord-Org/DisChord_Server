@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import runtime from '../runtime-instance';
+import { getComponentFileName } from 'src/utils/utils';
 
 const app = express();
 const PORT = runtime === 'dev'? 3000 : 45350;
@@ -24,7 +25,7 @@ app.get('/download/:component/:version', (req, res) => {
     const { component, version } = req.params;
     if (![ 'compiler', 'ide', 'cli' ].includes(component)) return res.status(400).json({ message: "Invalid component" });
     
-    const releasePath: string = path.join(ASSETS_PATH, component, `${component}-v${version}.exe`);
+    const releasePath: string = path.join(ASSETS_PATH, component, getComponentFileName(component as 'cli' | 'ide' | 'compiler', version));
     if (!fs.existsSync(releasePath)) return res.status(400).json({ message: 'Invalid version or component' });
     
     return res.download(releasePath);
