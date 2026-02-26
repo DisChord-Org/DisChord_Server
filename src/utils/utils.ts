@@ -1,7 +1,5 @@
-import Commander from "./commander";
-
-export function getComponentFileName (component: 'cli' | 'ide' | 'compiler', version: string) {
-    if (Commander.isWindows) {
+export function getComponentFileName (component: 'cli' | 'ide' | 'compiler', version: string, os: 'windows' | 'linux') {
+    if (os === 'windows') {
         return `${component}-v${version}-win-x64.exe`;
     } else {
         return `${component}-v${version}-linux`;

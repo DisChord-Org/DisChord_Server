@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import runtime from '../runtime-instance';
-import { getComponentFileName } from 'src/utils/utils';
+import { getComponentFileName } from '../utils/utils';
 
 const app = express();
 const PORT = runtime === 'dev'? 3000 : 45350;
@@ -21,11 +21,13 @@ app.get('/version/:component', (req, res) => {
     return res.json({ version, critical });
 });
 
-app.get('/download/:component/:version', (req, res) => {
-    const { component, version } = req.params;
+app.get('/download/:component/:version/:os', (req, res) => {
+    const { component, version, os } = req.params;
     if (![ 'compiler', 'ide', 'cli' ].includes(component)) return res.status(400).json({ message: "Invalid component" });
+    if (!/^\d+\.\d+\.\d+$/.test(version)) return res.status(400).json({ message: "Invalid version format" });
+    if (!['windows', 'linux'].includes(os)) return res.status(400).json({ message: "Invalid OS" });
     
-    const releasePath: string = path.join(ASSETS_PATH, component, getComponentFileName(component as 'cli' | 'ide' | 'compiler', version));
+    const releasePath: string = path.join(ASSETS_PATH, component, getComponentFileName(component as 'cli' | 'ide' | 'compiler', version, os as 'windows' | 'linux'));
     if (!fs.existsSync(releasePath)) return res.status(400).json({ message: 'Invalid version or component' });
     
     return res.download(releasePath);
