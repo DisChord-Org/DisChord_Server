@@ -21,6 +21,7 @@
     "rootDir": "./src",
     "baseUrl": ".",
     "stripInternal": true,
+    "resolveJsonModule": true
   },
   "exclude": [
       "node_modules"

@@ -1,34 +1,46 @@
 import express from 'express';
-import path from 'path';
-import fs from 'fs';
-import runtime from '../runtime-instance';
+import runtime from '../utils/runtime-instance';
 import { getComponentFileName } from 'src/utils/utils';
+import Version from '../utils/version-instance';
 
 const app = express();
 const PORT = runtime === 'dev'? 3000 : 45350;
-const ASSETS_PATH = runtime === 'dev'? path.join(process.cwd(), '/releases-test/releases') : '/var/www/dischord-assets/releases';
 
 app.use(express.json());
 
-app.get('/version/:component', (req, res) => {
-    const { component } = req.params;
-    if (![ 'compiler', 'ide', 'cli' ].includes(component)) return res.status(400).json({ message: "Invalid component" });
-
-    const releasesPath: string = path.join(ASSETS_PATH, component, 'version.json');
-    const versionFile = fs.readFileSync(releasesPath, 'utf-8');
-    const { version, critical } = JSON.parse(versionFile);
-
-    return res.json({ version, critical });
+app.get('/versions', (_req, res) => {
+    return res.json({
+        server: Version.server,
+        compiler: Version.compiler,
+        cli: Version.cli,
+        ide: Version.ide
+    });
 });
 
 app.get('/download/:component/:version', (req, res) => {
     const { component, version } = req.params;
-    if (![ 'compiler', 'ide', 'cli' ].includes(component)) return res.status(400).json({ message: "Invalid component" });
+    const userAgent = req.headers['user-agent'] || '';
+
+    let os: 'windows' | 'linux' | 'macos' = 'linux';
+    if (userAgent.includes('Win')) os = 'windows';
+    else if (userAgent.includes('Mac')) os = 'macos';
     
-    const releasePath: string = path.join(ASSETS_PATH, component, getComponentFileName(component as 'cli' | 'ide' | 'compiler', version));
-    if (!fs.existsSync(releasePath)) return res.status(400).json({ message: 'Invalid version or component' });
-    
-    return res.download(releasePath);
+    const repos = {
+        compiler: 'DisChord',
+        cli: 'DischordCLI',
+        ide: 'DisChord-Code-Studio'
+    };
+
+    const repoName = repos[component as keyof typeof repos];
+    if (!repoName) return res.status(400).json({ message: "Invalid component" });
+
+    let targetVersion = version;
+    if (version === 'latest') targetVersion = Version[component as keyof typeof repos];
+
+    const fileName = getComponentFileName(component as 'cli' | 'ide' | 'compiler', targetVersion, os, userAgent);
+    const githubUrl = `https://github.com/DisChord-Org/${repoName}/releases/download/${targetVersion}/${fileName}`;
+
+    return res.redirect(githubUrl);
 });
 
 app.listen(PORT, () => {
