@@ -11,6 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^17.3.1",
     "express": "^4.21.2",
     "typescript": "^5.9.3"
   },
