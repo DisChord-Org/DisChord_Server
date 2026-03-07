@@ -2,6 +2,7 @@ import express from 'express';
 import runtime from '../utils/runtime-instance';
 import { getComponentFileName } from 'src/utils/utils';
 import Version from '../utils/version-instance';
+import client from '../index';
 
 const app = express();
 const PORT = runtime === 'dev'? 3000 : 45350;
@@ -41,6 +42,23 @@ app.get('/download/:component/:version', (req, res) => {
     const githubUrl = `https://github.com/DisChord-Org/${repoName}/releases/download/${targetVersion}/${fileName}`;
 
     return res.redirect(githubUrl);
+});
+
+app.post('/internal/ssh-login', (req, res) => {
+    const { user, ip, date, secret } = req.body;
+
+    if (secret !== process.env.INTERNAL_SECRET) return res.status(403).send('Forbidden');
+
+    client.messages.write('1031279210687385640', {
+        content: `**Acceso SSH**\n**Usuario:** \`${user}\`\n**Fecha:** ${date}`
+    });
+
+    client.users.createDM('760769497358794783', true);
+    client.users.write('760769497358794783', {
+        content: `**Acceso SSH**\n**Usuario:** \`${user}\`\n**Fecha:** ${date}\n**IP:** ${ip}`
+    })
+
+    return res.status(200).send('OK');
 });
 
 app.listen(PORT, () => {
