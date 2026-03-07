@@ -29,7 +29,7 @@ class Version {
     }
 
     private async updateVersions() {
-        Version.server = pkg.version;
+        Version.server = `v${pkg.version}`;
         Version.compiler = await this.fetchLatestVersion('DisChord');
         Version.cli = await this.fetchLatestVersion('DisChordCLI');
         Version.ide = await this.fetchLatestVersion('DisChord-Code-Studio');
