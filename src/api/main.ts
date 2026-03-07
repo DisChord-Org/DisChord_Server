@@ -1,6 +1,6 @@
 import express from 'express';
 import runtime from '../utils/runtime-instance';
-import { getComponentFileName } from 'src/utils/utils';
+import { getComponentFileName } from '../utils/utils';
 import Version from '../utils/version-instance';
 import client from '../index';
 
