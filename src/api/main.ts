@@ -1,6 +1,6 @@
 import express from 'express';
 import runtime from '../utils/runtime-instance';
-import { getComponentFileName } from '../utils/utils';
+import { getComponentFileName, getSignatureFromGitHub, isNewer } from '../utils/utils';
 import Version from '../utils/version-instance';
 import client from '../index';
 
@@ -59,6 +59,26 @@ app.post('/internal/ssh-login', (req, res) => {
     })
 
     return res.status(200).send('OK');
+});
+
+app.get('/ide/update/:platform/:version', async (req, res) => {
+    const { platform, version } = req.params;
+
+    if (isNewer(Version.ide, version)) {
+        res.json({
+            version: Version.ide,
+            notes: "Nueva actualización disponible para DisChord IDE.",
+            pub_date: new Date().toISOString(),
+            platforms: {
+                "windows-x86_64": {
+                    "signature": await getSignatureFromGitHub(Version.ide, platform),
+                    "url": `https://github.com/DisChord-Org/IDE/releases/download/v${Version.ide}/dischord.msi.zip`
+                }
+            }
+        });
+    } else {
+        res.status(204).send();
+    }
 });
 
 app.listen(PORT, () => {

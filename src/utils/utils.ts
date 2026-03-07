@@ -18,3 +18,45 @@ export function getComponentFileName(component: 'cli' | 'ide' | 'compiler', vers
 
     return `${prefix}_${version}_amd64.deb`;
 }
+
+export function isNewer(latest: string, current: string): boolean {
+    const parse = (v: string) => v.replace(/^v/, '').split('.').map(Number);
+    const [lMajor, lMinor, lPatch] = parse(latest);
+    const [cMajor, cMinor, cPatch] = parse(current);
+
+    if (lMajor > cMajor) return true;
+    if (lMajor < cMajor) return false;
+    if (lMinor > cMinor) return true;
+    if (lMinor < cMinor) return false;
+    return lPatch > cPatch;
+}
+
+export async function getSignatureFromGitHub(version: string, platform: string): Promise<string> {
+    const extensionMap: Record<string, string> = {
+        'windows-x86_64': 'msi.zip.sig',
+        'darwin-aarch64': 'app.tar.gz.sig',
+        'darwin-x86_64': 'app.tar.gz.sig',
+        'linux-x86_64': 'AppImage.tar.gz.sig'
+    };
+
+    const suffix = extensionMap[platform];
+    if (!suffix) return "";
+
+    const fileName = `dischord-code-studio.${suffix}`;
+    const url = `https://github.com/tu-usuario/tu-repo/releases/download/v${version}/${fileName}`;
+
+    try {
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            console.error(`Firma no encontrada (${response.status}) para la versión ${version}`);
+            return "";
+        }
+
+        const signature = await response.text();
+        return signature.trim();
+    } catch (error) {
+        console.error("Error de red al obtener la firma de GitHub:", error);
+        return "";
+    }
+}
