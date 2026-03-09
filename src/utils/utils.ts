@@ -31,6 +31,9 @@ export function isNewer(latest: string, current: string): boolean {
     return lPatch > cPatch;
 }
 
+/**
+ * @deprecated
+*/
 export async function getSignatureFromGitHub(version: string, platform: string): Promise<string> {
     const extensionMap: Record<string, string> = {
         'windows-x86_64': 'msi.zip.sig',
