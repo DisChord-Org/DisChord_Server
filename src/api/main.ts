@@ -23,8 +23,23 @@ app.get('/download/:component/:version', (req, res) => {
     const userAgent = req.headers['user-agent'] || '';
 
     let os: 'windows' | 'linux' | 'macos' = 'linux';
-    if (userAgent.includes('Win')) os = 'windows';
-    else if (userAgent.includes('Mac')) os = 'macos';
+    
+    if (req.query.os) {
+        const queryOS = String(req.query.os).toLowerCase();
+        if (['windows', 'linux', 'macos'].includes(queryOS)) {
+            os = queryOS as 'windows' | 'linux' | 'macos';
+        }
+    } else {
+        const ua = userAgent.toLowerCase();
+        if (ua.includes('win')) os = 'windows';
+        else if (ua.includes('mac')) os = 'macos';
+    }
+    
+    return res.redirect(`/download/${component}/${version}/${os}`);
+});
+
+app.get('/download/:component/:version/:os', (req, res) => {
+    const { component, version, os } = req.params;
     
     const repos = {
         compiler: 'DisChord',
@@ -38,7 +53,7 @@ app.get('/download/:component/:version', (req, res) => {
     let targetVersion = version;
     if (version === 'latest') targetVersion = Version[component as keyof typeof repos];
 
-    const fileName = getComponentFileName(component as 'cli' | 'ide' | 'compiler', targetVersion, os, userAgent);
+    const fileName = getComponentFileName(component as 'cli' | 'ide' | 'compiler', targetVersion, os as 'windows' | 'linux' | 'macos');
     const githubUrl = `https://github.com/DisChord-Org/${repoName}/releases/download/${targetVersion}/${fileName}`;
 
     return res.redirect(githubUrl);
