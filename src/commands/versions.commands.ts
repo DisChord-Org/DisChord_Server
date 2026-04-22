@@ -1,4 +1,4 @@
-import { Declare, Options, Command, type CommandContext, IgnoreCommand, createBooleanOption } from 'seyfert';
+import { Middlewares, Declare, Options, Command, type CommandContext, IgnoreCommand, createBooleanOption } from 'seyfert';
 import Version from '../utils/version-instance';
 
 const options = {
@@ -15,6 +15,8 @@ const options = {
 })
 
 @Options(options)
+
+@Middlewares([ 'staff' ])
 
 export default class PingCommand extends Command {
     async run(ctx: CommandContext<typeof options>) {
