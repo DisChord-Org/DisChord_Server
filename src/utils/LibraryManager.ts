@@ -32,9 +32,9 @@ type RepositoryDataFromJSON = Record<RepositoryData['name'], RepositoryData>;
  * to automated downloads and updates via GitHub.
  */
 class LibraryManager {
-    private ReposBaseDir: string = path.join(process.cwd(), 'Repositories');
-    private AvailableReposPath: string = path.join(this.ReposBaseDir, 'AvailableRepos.json');
-    private DownloadedReposDir: string = path.join(this.ReposBaseDir, 'downloaded');
+    public ReposBaseDir: string = path.join(process.cwd(), 'Repositories');
+    public AvailableReposPath: string = path.join(this.ReposBaseDir, 'AvailableRepos.json');
+    public DownloadedReposDir: string = path.join(this.ReposBaseDir, 'downloaded');
 
     constructor () {
         this.checkPaths();
