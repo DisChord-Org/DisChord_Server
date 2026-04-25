@@ -1,11 +1,8 @@
 import { Client, ParseClient, ParseMiddlewares, UsingClient } from "seyfert";
 import { middlewares } from "./middlewares/middlewares";
-import "dotenv/config";
+import 'dotenv';
 import { onOptionsError, onPermissionsFail } from "./utils/overrides";
 import './api/main';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 const client = new Client({
     commands: {
