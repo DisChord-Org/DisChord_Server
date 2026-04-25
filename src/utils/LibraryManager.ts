@@ -16,8 +16,9 @@ enum TrustLevel {
 /**
  * Core metadata for a library repository.
  */
-interface RepositoryData {
+export interface RepositoryData {
     name: string;
+    description: string;
     trustLevel: TrustLevel;
     allowedVersions?: string[];
     githubUrl: string;
@@ -110,7 +111,7 @@ class LibraryManager {
         if (!this.isVersionAllowed(repository, tag)) return;
 
         const repoDir = path.join(this.DownloadedReposDir, repository.name);
-        if (fs.existsSync(repoDir)) fs.unlinkSync(repoDir);
+        if (fs.existsSync(repoDir)) fs.rmSync(repoDir, { recursive: true, force: true });
         fs.mkdirSync(repoDir);
 
         const zipUrl = releaseData.zipball_url;
@@ -175,7 +176,7 @@ class LibraryManager {
      * @param repository - The updated repository data.
      * @throws Error if the repository does not exist in the registry.
      */
-    public updateRepository(repository: RepositoryData) {
+    public updateRepositoryMetadata(repository: RepositoryData) {
         const currentRepos = this.repos;
 
         if (!currentRepos[repository.name]) throw new Error(`No se puede actualizar: El repositorio '${repository.name}' no existe.`);
