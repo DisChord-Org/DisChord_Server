@@ -12,12 +12,11 @@ class Version {
 
     private async fetchLatestVersion (repo: 'DisChord' | 'DisChordCLI' | 'DisChord-Code-Studio'): Promise<string> {
         const url = `https://api.github.com/repos/DisChord-Org/${repo}/releases/latest`;
-        const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
         const headers: HeadersInit = {
             'Accept': 'application/vnd.github.v3+json',
             'User-Agent': 'DisChord-IDE-App',
-            'Authorization': `token ${GITHUB_TOKEN}`
+            'Authorization': `token ${process.env.GITHUB_TOKEN}`
         };
 
         const response = await fetch(url, { headers });

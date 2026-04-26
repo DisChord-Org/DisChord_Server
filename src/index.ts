@@ -1,6 +1,6 @@
 import { Client, ParseClient, ParseMiddlewares, UsingClient } from "seyfert";
 import { middlewares } from "./middlewares/middlewares";
-import 'dotenv';
+import 'dotenv/config';
 import { onOptionsError, onPermissionsFail } from "./utils/overrides";
 import './server/main';
 

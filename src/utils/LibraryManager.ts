@@ -5,7 +5,7 @@ import semver from 'semver';
 /**
  * Defines the security level and automation constraints for a package.
  */
-enum TrustLevel {
+export enum TrustLevel {
     /** Untrusted or external community packages. */
     Unknown = 0,
     /** Trusted community packages; may require confirmation for sensitive actions. */
