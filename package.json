@@ -11,15 +11,15 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "dotenv": "^17.3.1",
-    "express": "^4.21.2",
+    "dotenv": "^17.4.2",
+    "express": "^4.22.1",
     "semver": "^7.7.4",
-    "seyfert": "^4.2.2",
+    "seyfert": "^4.3.0",
     "typescript": "^5.9.3"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
-    "@types/node": "^22.13.4",
+    "@types/node": "^22.19.17",
     "@types/semver": "^7.7.1",
     "tsx": "^4.21.0"
   }
