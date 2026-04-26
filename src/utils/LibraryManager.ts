@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs";
+import semver from 'semver';
 
 /**
  * Defines the security level and automation constraints for a package.
@@ -20,7 +21,7 @@ export interface RepositoryData {
     name: string;
     description: string;
     trustLevel: TrustLevel;
-    allowedVersions?: string[];
+    allowedVersions?: string[]; // Just for Unknown levels.
     githubUrl: string;
 }
 
@@ -32,9 +33,14 @@ type RepositoryDataFromJSON = Record<RepositoryData['name'], RepositoryData>;
  * to automated downloads and updates via GitHub.
  */
 class LibraryManager {
+    /** Base directory for all repository-related data. */
     public ReposBaseDir: string = path.join(process.cwd(), 'Repositories');
+    /** Path to the JSON file containing the registry of available repositories. */
     public AvailableReposPath: string = path.join(this.ReposBaseDir, 'AvailableRepos.json');
+    /** Directory where the physical library files (ZIPs) are stored. */
     public DownloadedReposDir: string = path.join(this.ReposBaseDir, 'downloaded');
+    /** In-memory cache to prevent GitHub API rate limiting for Official/Trust repositories. */
+    private versionCache: Record<string, { tag: string, expires: number }> = {};
 
     constructor () {
         this.checkPaths();
@@ -56,16 +62,23 @@ class LibraryManager {
 
     /**
      * Fetches the latest release data for a repository from the GitHub API.
-     * @returns A promise that resolves to the GitHub API Fetch Response.
+     * @param githubUrl The GitHub repository identifier.
+     * @returns A promise that resolves to the GitHub API release object.
+     * @throws Error if the GitHub API response is not OK.
      * @private
      */
-    private async downloadFromGitHub (githubUrl: RepositoryData['githubUrl']): Promise<Response> {
+    private async fetchGitHubRelease (githubUrl: RepositoryData['githubUrl']): Promise<any> {
         const apiUrl = `https://api.github.com/repos/${githubUrl}/releases/latest`;
-        return await fetch(apiUrl, {
+        const response = await fetch(apiUrl, {
             headers: {
-                'User-Agent': 'DisChord-Server'
+                'User-Agent': 'DisChord-Server',
+                'Authorization': `token ${process.env.GITHUB_TOKEN}`
             }
         });
+
+        if (!response.ok) throw new Error(`Error de GitHub API: ${response.statusText}`);
+
+        return await response.json();
     }
 
     /**
@@ -83,14 +96,13 @@ class LibraryManager {
      * @returns True if the version is allowed, false otherwise.
      */
     public isVersionAllowed(repository: RepositoryData, version: string): boolean {
-        if (repository.trustLevel === TrustLevel.Official) return true;
-        if (!repository.allowedVersions || repository.allowedVersions.length === 0) return true;
-
-        return repository.allowedVersions.includes(version);
+        if (repository.trustLevel >= TrustLevel.Trust) return true;
+        return repository.allowedVersions?.includes(version) ?? false;
     }
 
     /**
      * Registers a repository in the local registry and downloads its source code if allowed.
+     * For Official/Trust levels, it only updates metadata. For Unknown, it stores files physically.
      * @param repository The repository data to register.
      * @returns A promise that resolves when the operation is complete.
      * @throws Error if the GitHub API request or ZIP download fails.
@@ -98,77 +110,94 @@ class LibraryManager {
     public async registerAndDownload (repository: RepositoryData) {
         const currentRepos = this.repos;
 
+        const releaseData = await this.fetchGitHubRelease(repository.githubUrl);
+
         currentRepos[repository.name] = repository;
         fs.writeFileSync(this.AvailableReposPath, JSON.stringify(currentRepos, null, 4));
 
-        const response = await this.downloadFromGitHub(repository.githubUrl);
+        if (repository.trustLevel >= TrustLevel.Trust) return;
 
-        if (!response.ok) throw new Error(`GitHub API falló: ${response.statusText}`);
-            
-        const releaseData = await response.json();
         const tag = releaseData.tag_name;
 
-        if (!this.isVersionAllowed(repository, tag)) return;
+        if (!this.isVersionAllowed(repository, tag)) throw new Error(`El tag ${tag} no está permitido para el repositorio.`);
 
         const repoDir = path.join(this.DownloadedReposDir, repository.name);
-        if (fs.existsSync(repoDir)) fs.rmSync(repoDir, { recursive: true, force: true });
-        fs.mkdirSync(repoDir);
+        const versionDir = path.join(repoDir, tag);
 
-        const zipUrl = releaseData.zipball_url;
-        const zipResponse = await fetch(zipUrl);
+        if (fs.existsSync(versionDir)) return;
+        fs.mkdirSync(versionDir, { recursive: true });
 
+        const zipResponse = await fetch(releaseData.zipball_url);
         if (!zipResponse.ok) throw new Error("No se pudo descargar el archivo ZIP.");
 
-        const arrayBuffer = await zipResponse.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        const outputPath = path.join(repoDir, `${repository.name}-${tag}.zip`);
-
-        fs.writeFileSync(path.join(repoDir, 'version.txt'), tag, 'utf-8');
-        fs.writeFileSync(outputPath, buffer);
+        const buffer = Buffer.from(await zipResponse.arrayBuffer());
+        const zipPath = path.join(versionDir, `${repository.name}-${tag}.zip`);
+        
+        fs.writeFileSync(zipPath, buffer);
+        fs.writeFileSync(path.join(versionDir, 'version.txt'), tag, 'utf-8');
     }
 
     /**
-     * Reads the current local version of a downloaded library.
-     * @param repoName - The name of the repository to check
-     * @returns The tag name or null if the library isn't downloaded.
+     * Resolves the current version of a repository. 
+     * Uses GitHub API (with cache) for Official/Trust, or the highest local version for Unknown.
+     * @param repoName The name of the repository to check.
+     * @returns A promise resolving to the version tag or null if not found.
      */
-    public getLocalVersion(repoName: RepositoryData['name']): string | null {
-        const versionPath = path.join(this.DownloadedReposDir, repoName, 'version.txt');
+    public async getVersion(repoName: string): Promise<string | null> {
+        const repository = this.repos[repoName];
 
-        if (fs.existsSync(versionPath)) return fs.readFileSync(versionPath, 'utf-8').trim();
+        if (repository.trustLevel >= TrustLevel.Trust) {
+            const now = Date.now();
+            const cached = this.versionCache[repoName];
 
-        return null;
-    }
+            if (cached && now < cached.expires) return cached.tag;
 
-    /**
-     * Compares local versions with the latest GitHub releases and updates if necessary.
-     * @returns A promise that resolves when all repositories have been checked and updated.
-     */
-    public async updateAllDownloadedRepositories() {
-        const allRepos = this.repos;
-        const repoNames = Object.keys(allRepos);
+            const releaseData = await this.fetchGitHubRelease(repository.githubUrl);
+            const tag = releaseData.tag_name;
 
-        for (const name of repoNames) {
-            const repository = allRepos[name];
-            const currentLocalVersion = this.getLocalVersion(name);
-
-            const response = await this.downloadFromGitHub(repository.githubUrl);
-            if (!response.ok) continue;
-
-            const release = await response.json();
-
-            if (currentLocalVersion === release.tag_name) continue;
-
-            await this.registerAndDownload(repository);
+            this.versionCache[repoName] = { tag, expires: now + (10 * 60 * 1000) };
+            return tag;
         }
+
+        const repoDir = path.join(this.DownloadedReposDir, repoName);
+        if (!fs.existsSync(repoDir)) return null;
+
+        const versions = fs.readdirSync(repoDir).filter(folder => {
+            return fs.statSync(path.join(repoDir, folder)).isDirectory();
+        });
+
+        if (versions.length === 0) return null;
+
+        return versions.sort(semver.compare).reverse()[0];
     }
 
     /**
-     * Checks if a repository name exists in the local registry.
-     * @returns True if the repository exists, false otherwise.
+     * Construct the physical path to a specific version's ZIP file.
+     * @param repoName Name of the repository.
+     * @param version Specific version tag.
+     * @returns The full path to the ZIP file or null if it doesn't exist.
      */
-    public existsRepository(repoName: RepositoryData['name']): boolean {
-        return !!this.repos[repoName];
+    public getZipPath(repoName: string, version: string): string | null {
+        const zipPath = path.join(this.DownloadedReposDir, repoName, version, `${repoName}-${version}.zip`);
+        return fs.existsSync(zipPath) ? zipPath : null;
+    }
+
+    /**
+     * Whitelists a new version for an Unknown repository and triggers its download.
+     * @param repoName The name of the repository.
+     * @param version The specific tag name to allow and download.
+     * @throws Error if the repository is not registered.
+     */
+    public async allowAndDownloadVersion(repoName: string, version: string) {
+        const repository = this.repos[repoName];
+        if (!repository) throw new Error("El repositorio no existe");
+
+        if (!this.isVersionAllowed(repository, version)) {
+            repository.allowedVersions?.push(version);
+            this.updateRepositoryMetadata(repository);
+        }
+
+        await this.registerAndDownload(this.repos[repoName]);
     }
 
     /**
@@ -199,6 +228,21 @@ class LibraryManager {
 
         const repoDir = path.join(this.DownloadedReposDir, repoName);
         if (fs.existsSync(repoDir)) fs.rmSync(repoDir, { recursive: true, force: true });
+    }
+
+    /**
+     * Manually overrides the version.txt of a repository and updates allowedVersions.
+     * @param repoName The name of the repository.
+     * @param newVersion The version tag to set as current.
+     * @throws Error if the repository is not registered.
+     */
+    public updateRepositoryVersion(repoName: RepositoryData['name'], newVersion: string) {
+        const repository = this.repos[repoName];
+        if (!repository) throw new Error(`No se puede actualizar la versión: El repositorio '${repoName}' no existe.`);
+        
+        const versionPath = path.join(this.DownloadedReposDir, repoName, 'version.txt');
+        fs.writeFileSync(versionPath, newVersion, 'utf-8');
+        this.updateRepositoryMetadata({ ...repository, allowedVersions: [ newVersion ] });
     }
 }
 

@@ -14,12 +14,13 @@ interface PackageResponse {
 type PackagesRecordResponse = Record<PackageResponse['name'], PackageResponse>;
 type pkgName = keyof typeof LibraryManagerInstance.repos;
 
-export const getPackages = (_req: Request, res: Response) => {
+export const getPackages = async (_req: Request, res: Response) => {
     const packages: PackagesRecordResponse = {};
 
     for (const repo in LibraryManagerInstance.repos) {
         const pkg = LibraryManagerInstance.repos[repo as pkgName];
-        const version = LibraryManagerInstance.getLocalVersion(repo as pkgName) || 'unknown';
+        const version = await LibraryManagerInstance.getVersion(repo as pkgName);
+        if (!version) continue;
 
         packages[repo] = {
             name: pkg.name,
@@ -33,7 +34,7 @@ export const getPackages = (_req: Request, res: Response) => {
     res.json(packages);
 };
 
-export const getPackage = (req: Request, res: Response) => {
+export const getPackage = async (req: Request, res: Response) => {
     const { repo } = req.params;
     const pkg = LibraryManagerInstance.repos[repo as pkgName];
     if (!pkg) return res.status(404).json({ error: 'Package not found' });
@@ -46,7 +47,7 @@ export const downloadPackage = async (req: Request, res: Response) => {
     const pkg = LibraryManagerInstance.repos[repo as pkgName];
     if (!pkg) return res.status(404).json({ error: 'Package not found in registry' });
 
-    const version = LibraryManagerInstance.getLocalVersion(repo as pkgName);
+    const version = await LibraryManagerInstance.getVersion(repo as pkgName);
     if (!version) return res.status(404).json({ error: 'Package files not found. Does it exists on the server?' });
 
     const zipName = `${pkg.name}-${version}.zip`;
