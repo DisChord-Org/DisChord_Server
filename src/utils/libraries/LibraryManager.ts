@@ -1,8 +1,9 @@
 import semver from 'semver';
 
-import { RepositoryData, TrustLevel } from "./types";
+import { PackageVersion, RepositoryData, TrustLevel } from "./types";
 import StorageService from "./StorageService";
 import GitHubService from "./GitHubService";
+import { SecurityService } from './SecurityService';
 
 /**
  * The Orchestrator. Coordinates storage, GitHub communication, and security
@@ -42,12 +43,43 @@ class LibraryManager {
     }
 
     /**
-     * Downloads, (future) signs, and stores a package.
+     * Downloads, signs, and stores a package.
      */
     private static async downloadAndProcessPackage(repoName: RepositoryData['name'], tag: string, zipUrl: string) {
         const buffer = await GitHubService.downloadZipBuffer(zipUrl);
+        const repository = StorageService.getRepo(repoName);
+        if (!repository) throw new Error("Repositorio no registrado");
 
         StorageService.savePackageFiles(repoName, tag, buffer);
+        const zipPath = StorageService.getZipPath(repoName, tag);
+        if (!zipPath) throw new Error("Error al guardar el archivo temporal.");
+
+        const versionInfo: PackageVersion = {
+            tag,
+            isAudited: false,
+            downloadUrl: zipUrl,
+            createdAt: Date.now()
+        };
+
+        switch (repository.trustLevel) {
+            case TrustLevel.Official:
+                SecurityService.signFile(zipPath);
+                versionInfo.signature = SecurityService.getSignatureContent(zipPath) || undefined;
+                versionInfo.isAudited = true;
+
+                StorageService.removePackageZip(repoName, tag);
+                break;
+            case TrustLevel.Unknown:
+                SecurityService.signFile(zipPath);
+                versionInfo.signature = SecurityService.getSignatureContent(zipPath) || undefined;
+                versionInfo.isAudited = true;
+                break;
+            default:
+                break;
+        }
+
+        repository.versions[tag] = versionInfo;
+        LibraryManager.updateRepositoryMetadata(repository);
     }
 
     /**

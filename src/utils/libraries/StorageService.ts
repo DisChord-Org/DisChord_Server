@@ -84,6 +84,11 @@ class StorageService {
         const repoDir = path.join(StorageService.DownloadedReposDir, repoName);
         if (fs.existsSync(repoDir)) fs.rmSync(repoDir, { recursive: true, force: true });
     }
+
+    public static removePackageZip(repoName: string, tag: string) {
+        const zipPath = StorageService.getZipPath(repoName, tag);
+        if (zipPath) fs.unlinkSync(zipPath);
+    }
 }
 
 new StorageService();
