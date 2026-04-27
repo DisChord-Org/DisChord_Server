@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
-import { LibraryManagerInstance, RepositoryData } from 'src/utils/LibraryManager';
+import { LibraryManagerInstance, RepositoryData, TrustLevel } from 'src/utils/LibraryManager';
 
 interface PackageResponse {
     name: RepositoryData['name'];
@@ -50,15 +50,19 @@ export const downloadPackage = async (req: Request, res: Response) => {
     const version = await LibraryManagerInstance.getVersion(repo as pkgName);
     if (!version) return res.status(404).json({ error: 'Package files not found. Does it exists on the server?' });
 
-    const zipName = `${pkg.name}-${version}.zip`;
-    const zipPath = path.join(LibraryManagerInstance.DownloadedReposDir, pkg.name, zipName);
+    if (pkg.trustLevel >= TrustLevel.Unknown) {
+        return res.redirect(`https://github.com/${pkg.githubUrl}/releases/download/${version}/${pkg.name}-${version}`);
+    } else {
+        const zipName = `${pkg.name}-${version}.zip`;
+        const zipPath = path.join(LibraryManagerInstance.DownloadedReposDir, version, pkg.name, zipName);
 
-    if (!fs.existsSync(zipPath)) return res.status(404).json({ error: 'Physical ZIP file not found on server' });
+        if (!fs.existsSync(zipPath)) return res.status(404).json({ error: 'Physical ZIP file not found on server' });
 
-    return res.download(zipPath, zipName, (err) => {
-        if (err) {
-            console.error(`Error enviando el paquete ${repo}:`, err);
-            if (!res.headersSent) res.status(500).send('Error downloading file');
-        }
-    });
+        return res.download(zipPath, zipName, (err) => {
+            if (err) {
+                console.error(`Error enviando el paquete ${repo}:`, err);
+                if (!res.headersSent) res.status(500).send('Error downloading file');
+            }
+        });
+    }
 };
