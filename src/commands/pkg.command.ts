@@ -1,5 +1,7 @@
 import { Middlewares, Declare, Command, type CommandContext, IgnoreCommand } from 'seyfert';
-import { LibraryManagerInstance, TrustLevel } from 'src/utils/LibraryManager';
+import LibraryManager from 'src/utils/libraries/LibraryManager';
+import StorageService from 'src/utils/libraries/StorageService';
+import { RepositoryData, TrustLevel } from 'src/utils/libraries/types';
 
 @Declare({
     name: "pkg",
@@ -66,13 +68,15 @@ export default class PingCommand extends Command {
                         }
 
                         try {
-                            await LibraryManagerInstance.registerAndDownload({
+                            await LibraryManager.registerAndDownload({
                                 name,
                                 description,
                                 trustLevel,
-                                allowedVersions: trustLevel === TrustLevel.Unknown ? [] : undefined,
-                                githubUrl
-                            });
+                                githubUrl,
+                                ...(trustLevel === TrustLevel.Unknown 
+                                    ? { allowedVersions: [] as string[] } 
+                                    : {})
+                            } as RepositoryData);
                         } catch (error) {
                             message.edit({ content: this.addContent(args, `Error al registrar el repositorio:\n    ${(error as Error).message}`) });
                             return;
@@ -82,7 +86,7 @@ export default class PingCommand extends Command {
                         return;
                     case 'list':
                     case 'lst':
-                        const repos = LibraryManagerInstance.repos;
+                        const repos = StorageService.getRepos();
                         const repoList = Object.values(repos).filter(repo => !args[1] || repo.name === args[1] || repo.name.startsWith(args[1]) || repo.description.startsWith(args[1])).map(repo => `${repo.name} (${TrustLevel[repo.trustLevel]})\n    - ${repo.githubUrl}\n    - ${repo.description}`).join('\n');
 
                         message.edit({ content: this.addContent(args, repoList) });
@@ -95,12 +99,12 @@ export default class PingCommand extends Command {
                         }
 
                         const repoName = args[1];
-                        if (!LibraryManagerInstance.repos[repoName]) {
+                        if (!StorageService.getRepo(repoName)) {
                             message.edit({ content: this.addContent(args, `El repositorio '${repoName}' no existe.`) });
                             return;
                         }
                         
-                        LibraryManagerInstance.deleteRepository(repoName);
+                        LibraryManager.deleteRepository(repoName)
 
                         message.edit({ content: this.addContent(args, `Repositorio '${repoName}' eliminado exitosamente.`) });
                         return;
@@ -112,7 +116,7 @@ export default class PingCommand extends Command {
                         }
 
                         const modifiedName = args[1];
-                        const repo = LibraryManagerInstance.repos[modifiedName];
+                        const repo = StorageService.getRepo(modifiedName);
                         if (!repo) {
                             message.edit({ content: this.addContent(args, `El repositorio '${modifiedName}' no existe.`) });
                             return;
@@ -139,13 +143,15 @@ export default class PingCommand extends Command {
                         }
 
                         try {
-                            LibraryManagerInstance.updateRepositoryMetadata({
+                            LibraryManager.updateRepositoryMetadata({
                                 name: modifiedName,
                                 description: modifiedDescription,
                                 trustLevel: modifiedTrustLevel,
-                                allowedVersions: modifiedTrustLevel === TrustLevel.Unknown ? [] : undefined,
-                                githubUrl: modifiedGithubUrl
-                            });
+                                githubUrl: modifiedGithubUrl,
+                                ...(modifiedTrustLevel === TrustLevel.Unknown 
+                                    ? { allowedVersions: [] as string[] } 
+                                    : {})
+                            } as RepositoryData);
                         } catch (error) {
                             message.edit({ content: this.addContent(args, `Error al modificar el repositorio:\n    ${(error as Error).message}`) });
                             return;
@@ -162,14 +168,14 @@ export default class PingCommand extends Command {
 
                         const checkRepoName = args[1];
                         const checkVersion = args[2];
-                        const checkRepo = LibraryManagerInstance.repos[checkRepoName];
+                        const checkRepo = StorageService.getRepo(checkRepoName);
 
                         if (!checkRepo) {
                             message.edit({ content: this.addContent(args, `El repositorio '${checkRepoName}' no existe.`) });
                             return;
                         }
 
-                        const isAllowed = LibraryManagerInstance.isVersionAllowed(checkRepo, checkVersion);
+                        const isAllowed = LibraryManager.isVersionAllowed(checkRepo, checkVersion);
 
                         message.edit({ content: this.addContent(args, `'${checkRepoName} ${checkVersion}' ${isAllowed ? 'está' : 'NO está'} permitido.`) });
                         return;
@@ -182,7 +188,7 @@ export default class PingCommand extends Command {
 
                         const allowRepoName = args[1];
                         const allowVersion = args[2];
-                        const allowRepo = LibraryManagerInstance.repos[allowRepoName];
+                        const allowRepo = StorageService.getRepo(allowRepoName);
 
                         if (!allowRepo) {
                             message.edit({ content: this.addContent(args, `El repositorio '${allowRepoName}' no existe.`) });
@@ -195,7 +201,7 @@ export default class PingCommand extends Command {
                         }
 
                         try {
-                            await LibraryManagerInstance.allowAndDownloadVersion(allowRepoName, allowVersion);
+                            await LibraryManager.allowAndDownloadVersion(allowRepoName, allowVersion);
                         } catch (error) {
                             message.edit({ content: this.addContent(args, `Error al permitir y descargar la versión '${allowVersion}' del repositorio '${allowRepoName}':\n    ${(error as Error).message}`) });
                             return;
@@ -211,13 +217,13 @@ export default class PingCommand extends Command {
                         }
 
                         const versionRepoName = args[1];
-                        const versionRepo = LibraryManagerInstance.repos[versionRepoName];
+                        const versionRepo = StorageService.getRepo(versionRepoName);
                         if (!versionRepo) {
                             message.edit({ content: this.addContent(args, `El repositorio '${versionRepoName}' no existe.`) });
                             return;
                         }
 
-                        const localVersion = await LibraryManagerInstance.getVersion(versionRepoName);
+                        const localVersion = await LibraryManager.getVersion(versionRepoName);
 
                         if (!localVersion) {
                             message.edit({ content: this.addContent(args, `No hay una versión descargada para el repositorio '${versionRepoName}'.`) });

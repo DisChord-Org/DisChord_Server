@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
-import path from 'path';
-import fs from 'fs';
-import { LibraryManagerInstance, RepositoryData, TrustLevel } from 'src/utils/LibraryManager';
+
+import LibraryManager from 'src/utils/libraries/LibraryManager';
+import { RepositoryData, TrustLevel } from 'src/utils/libraries/types';
+import StorageService from 'src/utils/libraries/StorageService';
 
 interface PackageResponse {
     name: RepositoryData['name'];
@@ -12,57 +13,64 @@ interface PackageResponse {
 }
 
 type PackagesRecordResponse = Record<PackageResponse['name'], PackageResponse>;
-type pkgName = keyof typeof LibraryManagerInstance.repos;
+type pkgName = keyof typeof StorageService.getRepos;
 
 export const getPackages = async (_req: Request, res: Response) => {
-    const packages: PackagesRecordResponse = {};
+    const repositories = StorageService.getRepos();
+    const repoKeys = Object.keys(repositories) as pkgName[];
 
-    for (const repo in LibraryManagerInstance.repos) {
-        const pkg = LibraryManagerInstance.repos[repo as pkgName];
-        const version = await LibraryManagerInstance.getVersion(repo as pkgName);
-        if (!version) continue;
+    const packagesList = await Promise.all(repoKeys.map(async (name): Promise<PackageResponse | null> => {
+        const pkg = repositories[name];
+        const version = await LibraryManager.getVersion(name);
+        
+        if (!version) return null;
 
-        packages[repo] = {
+        return {
             name: pkg.name,
             description: pkg.description,
             trustLevel: pkg.trustLevel,
             repository: pkg.githubUrl,
             version
-        };
-    };
+        } as PackageResponse;
+    }));
 
-    res.json(packages);
+    const response: PackagesRecordResponse = packagesList
+        .filter(p => p !== null)
+        .reduce((acc, curr) => ({ ...acc, [curr!.name]: curr }), {});
+
+    res.json(response);
 };
 
 export const getPackage = async (req: Request, res: Response) => {
     const { repo } = req.params;
-    const pkg = LibraryManagerInstance.repos[repo as pkgName];
+    const pkg = StorageService.getRepo(repo as pkgName);
     if (!pkg) return res.status(404).json({ error: 'Package not found' });
 
-    return res.json(pkg);
+    return res.json({
+        name: pkg.name,
+        description: pkg.description,
+        trustLevel: pkg.trustLevel,
+        repository: pkg.githubUrl,
+        version: await LibraryManager.getVersion(pkg.name)
+    } as PackageResponse);
 };
 
 export const downloadPackage = async (req: Request, res: Response) => {
-    const { repo } = req.params;
-    const pkg = LibraryManagerInstance.repos[repo as pkgName];
+    const { repo } = req.params as pkgName;
+    const pkg = StorageService.getRepo(repo);
+    
     if (!pkg) return res.status(404).json({ error: 'Package not found in registry' });
 
-    const version = await LibraryManagerInstance.getVersion(repo as pkgName);
-    if (!version) return res.status(404).json({ error: 'Package files not found. Does it exists on the server?' });
+    const version = await LibraryManager.getVersion(repo);
+    if (!version) return res.status(404).json({ error: 'No version available' });
 
-    if (pkg.trustLevel >= TrustLevel.Unknown) {
-        return res.redirect(`https://github.com/${pkg.githubUrl}/releases/download/${version}/${pkg.name}-${version}`);
-    } else {
-        const zipName = `${pkg.name}-${version}.zip`;
-        const zipPath = path.join(LibraryManagerInstance.DownloadedReposDir, version, pkg.name, zipName);
+    if (pkg.trustLevel >= TrustLevel.Trust) {
+        return res.redirect(`https://github.com/${pkg.githubUrl}/archive/refs/tags/${version}.zip`);
+    } 
 
-        if (!fs.existsSync(zipPath)) return res.status(404).json({ error: 'Physical ZIP file not found on server' });
+    const zipPath = StorageService.getZipPath(pkg.name, version);
+    
+    if (!zipPath) return res.status(404).json({ error: 'Physical ZIP file not found on server' });
 
-        return res.download(zipPath, zipName, (err) => {
-            if (err) {
-                console.error(`Error enviando el paquete ${repo}:`, err);
-                if (!res.headersSent) res.status(500).send('Error downloading file');
-            }
-        });
-    }
+    return res.download(zipPath, `${pkg.name}-${version}.zip`);
 };
