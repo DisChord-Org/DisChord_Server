@@ -139,6 +139,26 @@ class LibraryManager {
         StorageService.saveRepos(repos);
         StorageService.removeRepoDirectory(repoName);
     }
+
+    /**
+     * Manual audit for Trust packages. Signs the file and upgrades the trust status.
+     */
+    public static async auditAndSignTrust(repoName: string, tag: string) {
+        const repository = StorageService.getRepo(repoName);
+        const zipPath = StorageService.getZipPath(repoName, tag);
+
+        if (!repository || !zipPath) throw new Error("Paquete o archivo ZIP no encontrado.");
+        if (repository.trustLevel !== TrustLevel.Trust) throw new Error("Solo se pueden auditar manualmente paquetes de nivel Trust.");
+
+        SecurityService.signFile(zipPath);
+
+        const version = repository.versions[tag];
+        if (version) {
+            version.signature = SecurityService.getSignatureContent(zipPath) || undefined;
+            version.isAudited = true;
+            LibraryManager.updateRepositoryMetadata(repository);
+        }
+    }
 }
 
 export default LibraryManager;
