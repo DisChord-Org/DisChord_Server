@@ -46,6 +46,7 @@ export const getPackage = async (req: Request, res: Response) => {
     if (!pkg) return res.status(404).json({ error: 'Package not found' });
 
     const tag = await LibraryManager.getVersion(pkg.name);
+    if (!tag) return res.status(404).json({ error: 'No version available' });
     const version = tag? pkg.versions[tag] : null;
 
     return res.json({
@@ -68,14 +69,12 @@ export const downloadPackage = async (req: Request, res: Response) => {
     const tag = await LibraryManager.getVersion(repo);
     if (!tag) return res.status(404).json({ error: 'No version available' });
 
-    const version = pkg.versions[tag];
-
     if (pkg.trustLevel >= TrustLevel.Trust) {
-        return res.redirect(`https://github.com/${pkg.githubUrl}/archive/refs/tags/${version}.zip`);
+        return res.redirect(`https://github.com/${pkg.githubUrl}/archive/refs/tags/${tag}.zip`);
     } 
 
     const zipPath = StorageService.getZipPath(pkg.name, tag);
     if (!zipPath) return res.status(404).json({ error: 'Physical ZIP file not found on server' });
 
-    return res.download(zipPath, `${pkg.name}-${version}.zip`);
+    return res.download(zipPath, `${pkg.name}-${tag}.zip`);
 };
