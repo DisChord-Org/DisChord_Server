@@ -10,6 +10,8 @@ interface PackageResponse {
     trustLevel: RepositoryData['trustLevel'];
     repository: RepositoryData['githubUrl'];
     version: string;
+    signature?: string;
+    isAudited: boolean;
 }
 
 type PackagesRecordResponse = Record<PackageResponse['name'], PackageResponse>;
@@ -21,16 +23,13 @@ export const getPackages = async (_req: Request, res: Response) => {
 
     const packagesList = await Promise.all(repoKeys.map(async (name): Promise<PackageResponse | null> => {
         const pkg = repositories[name];
-        const version = await LibraryManager.getVersion(name);
-        
-        if (!version) return null;
 
         return {
             name: pkg.name,
             description: pkg.description,
             trustLevel: pkg.trustLevel,
             repository: pkg.githubUrl,
-            version
+            version: await LibraryManager.getVersion(pkg.name)
         } as PackageResponse;
     }));
 
@@ -46,12 +45,17 @@ export const getPackage = async (req: Request, res: Response) => {
     const pkg = StorageService.getRepo(repo as pkgName);
     if (!pkg) return res.status(404).json({ error: 'Package not found' });
 
+    const tag = await LibraryManager.getVersion(pkg.name);
+    const version = tag? pkg.versions[tag] : null;
+
     return res.json({
         name: pkg.name,
         description: pkg.description,
         trustLevel: pkg.trustLevel,
         repository: pkg.githubUrl,
-        version: await LibraryManager.getVersion(pkg.name)
+        version: tag,
+        signature: version?.signature,
+        isAudited: version?.isAudited ?? false
     } as PackageResponse);
 };
 
@@ -61,15 +65,16 @@ export const downloadPackage = async (req: Request, res: Response) => {
     
     if (!pkg) return res.status(404).json({ error: 'Package not found in registry' });
 
-    const version = await LibraryManager.getVersion(repo);
-    if (!version) return res.status(404).json({ error: 'No version available' });
+    const tag = await LibraryManager.getVersion(repo);
+    if (!tag) return res.status(404).json({ error: 'No version available' });
+
+    const version = pkg.versions[tag];
 
     if (pkg.trustLevel >= TrustLevel.Trust) {
         return res.redirect(`https://github.com/${pkg.githubUrl}/archive/refs/tags/${version}.zip`);
     } 
 
-    const zipPath = StorageService.getZipPath(pkg.name, version);
-    
+    const zipPath = StorageService.getZipPath(pkg.name, tag);
     if (!zipPath) return res.status(404).json({ error: 'Physical ZIP file not found on server' });
 
     return res.download(zipPath, `${pkg.name}-${version}.zip`);
