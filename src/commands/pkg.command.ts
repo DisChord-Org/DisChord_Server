@@ -11,8 +11,8 @@ import { RepositoryData, TrustLevel } from 'src/utils/libraries/types';
 
 @Middlewares([ 'staff' ])
 
-export default class PingCommand extends Command {
-    private content: string[] = ['# Introduzca comandos para la gestión de paquetes', 'stp (stop) | cls (clear) | add | lst (list) [pkg] | del (delete) | md (modify) | illw (is-allowed)\nllw (allow-with-download) | gv (get-version)'];
+export default class PackageCommand extends Command {
+    private content: string[] = ['# Introduzca comandos para la gestión de paquetes', 'stp (stop) | cls (clear) | add | lst (list) [pkg] | del (delete) | md (modify) | illw (is-allowed)\nllw (allow-with-download) | gv (get-version) | sg (sign)'];
 
     private addContent(args: string[], message: string, addEndIndicator: boolean = true): string {
         if (this.content.length >= 12) this.content.splice(2, 1);
@@ -231,6 +231,30 @@ export default class PingCommand extends Command {
                         }
 
                         message.edit({ content: this.addContent(args, `'${versionRepoName} ${localVersion}' (latest)`) });
+                        return;
+                    case 'sign':
+                    case 'sg':
+                        if (args.length < 3) {
+                            message.edit({ content: this.addContent(args, 'Modo de uso:\nsg <pkg> <version>') });
+                            return;
+                        }
+
+                        const signRepoName = args[1];
+                        const versionRepoSg = args[2];
+
+                        if (!signRepoName) {
+                            message.edit({ content: this.addContent(args, `El repositorio '${signRepoName}' no existe.`) });
+                            return;
+                        }
+
+                        try {
+                            LibraryManager.auditAndSignTrust(signRepoName, versionRepoSg);
+                        } catch (error) {
+                            message.edit({ content: this.addContent(args, `Error al firmar el paquete:\n    ${(error as Error).message}`) });
+                            return;
+                        }
+
+                        message.edit({ content: this.addContent(args, `Se ha firmado el paquete.`) });
                         return;
                     case 'clear':
                     case 'cls':
