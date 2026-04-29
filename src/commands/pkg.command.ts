@@ -14,13 +14,13 @@ import { RepositoryData, TrustLevel } from 'src/utils/libraries/types';
 export default class PackageCommand extends Command {
     private content: string[] = ['# Introduzca comandos para la gestión de paquetes', 'stp (stop) | cls (clear) | add | lst (list) [pkg] | del (delete) | md (modify) | illw (is-allowed)\nllw (allow-with-download) | gv (get-version) | sg (sign)'];
 
-    private addContent(args: string[], message: string, addEndIndicator: boolean = true): string {
+    private addContent (args: string[], message: string, addEndIndicator: boolean = true): string {
         if (this.content.length >= 12) this.content.splice(2, 1);
         this.content.push(`> ${args.join(' ')}`, `${message}`);
         return this.getContent(addEndIndicator);
     }
 
-    private getContent(addEndIndicator: boolean = true): string {
+    private getContent (addEndIndicator: boolean = true): string {
         const content = `\`\`\`bash\n${this.content.join('\n')}${addEndIndicator ? '\n> ' : ''}\`\`\``;
         if (content.length > 2000) return 'El contenido es demasiado largo para ser mostrado.';
 

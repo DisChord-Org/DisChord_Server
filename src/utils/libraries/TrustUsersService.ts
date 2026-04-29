@@ -48,6 +48,18 @@ class TrustUsersService {
         return JSON.parse(fs.readFileSync(userPath, 'utf-8'));
     }
 
+    public static getUsers (): TrustUser[] {
+        const users: TrustUser[] = [];
+
+        for (const file of fs.readdirSync(this.UsersDir)) {
+            const fileContent = fs.readFileSync(path.join(this.UsersDir, file), 'utf-8');
+
+            users.push(JSON.parse(fileContent));
+        }
+
+        return users;
+    }
+
     public static getUserRole (id: string): TrustUser['role'] {
         const user = TrustUsersService.getUser(id);
         if (!user) throw new Error(`El usuario ${id} no existe.`);
@@ -65,5 +77,7 @@ class TrustUsersService {
         return !!TrustUsersService.getUser(id);
     }
 }
+
+new TrustUsersService();
 
 export default TrustUsersService;
