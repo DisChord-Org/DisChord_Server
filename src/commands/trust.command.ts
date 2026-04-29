@@ -1,8 +1,8 @@
 import { Middlewares, Declare, Command, type CommandContext, IgnoreCommand } from 'seyfert';
-import LibraryManager from 'src/utils/libraries/LibraryManager';
-import StorageService from 'src/utils/libraries/StorageService';
-import TrustUsersService from 'src/utils/libraries/TrustUsersService';
-import { TrustUser, TrustUserRole } from 'src/utils/libraries/types';
+import LibraryManager from '../utils/libraries/LibraryManager';
+import StorageService from '../utils/libraries/StorageService';
+import TrustUsersService from '../utils/libraries/TrustUsersService';
+import { TrustUser, TrustUserRole } from '../utils/libraries/types';
 
 @Declare({
     name: "trust",

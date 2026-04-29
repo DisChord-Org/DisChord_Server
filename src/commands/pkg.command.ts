@@ -1,7 +1,7 @@
 import { Middlewares, Declare, Command, type CommandContext, IgnoreCommand } from 'seyfert';
-import LibraryManager from 'src/utils/libraries/LibraryManager';
-import StorageService from 'src/utils/libraries/StorageService';
-import { RepositoryData, TrustLevel } from 'src/utils/libraries/types';
+import LibraryManager from '../utils/libraries/LibraryManager';
+import StorageService from '../utils/libraries/StorageService';
+import { RepositoryData, TrustLevel } from '../utils/libraries/types';
 
 @Declare({
     name: "pkg",

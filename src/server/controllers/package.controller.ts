@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
 
-import LibraryManager from 'src/utils/libraries/LibraryManager';
-import { RepositoryData, TrustLevel } from 'src/utils/libraries/types';
-import StorageService from 'src/utils/libraries/StorageService';
+import LibraryManager from '../../utils/libraries/LibraryManager';
+import { RepositoryData, TrustLevel } from '../../utils/libraries/types';
+import StorageService from '../../utils/libraries/StorageService';
 
 interface PackageResponse {
     name: RepositoryData['name'];

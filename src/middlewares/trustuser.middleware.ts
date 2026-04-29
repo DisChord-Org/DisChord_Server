@@ -1,5 +1,5 @@
 import { createMiddleware } from "seyfert";
-import TrustUsersService from "src/utils/libraries/TrustUsersService";
+import TrustUsersService from "../utils/libraries/TrustUsersService";
 
 export const trustUserMiddleware = createMiddleware<void>(
     async (middle) => {
