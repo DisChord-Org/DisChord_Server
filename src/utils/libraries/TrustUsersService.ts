@@ -141,6 +141,7 @@ class TrustUsersService {
     }
 }
 
+// Initializing structure upon service import
 new TrustUsersService();
 
 export default TrustUsersService;
