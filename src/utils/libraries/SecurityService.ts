@@ -41,8 +41,8 @@ export class SecurityService {
 
     /**
      * Verifies a file's integrity and authenticity against a detached GPG signature.
-     * * @param {string} filePath - Path to the original file (e.g., the .zip package).
-     * @param {string} signaturePath - Path to the detached signature file (e.g., the .asc file).
+     * @param {string} filePath - Path to the original file.
+     * @param {string} signaturePath - Path to the detached signature file.
      * @returns {boolean} True if the signature is valid and matches the file, false otherwise.
      */
     public static verifySignature(filePath: string, signaturePath: string): boolean {
