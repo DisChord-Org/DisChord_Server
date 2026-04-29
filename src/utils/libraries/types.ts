@@ -42,3 +42,15 @@ export type RepositoryData = OfficialRepository | TrustRepository | UnknownRepos
 
 /** Map structure for repository JSON storage. */
 export type RepositoryDataFromJSON = Record<RepositoryData['name'], RepositoryData>;
+
+export enum TrustUserRole {
+    Admin = 0,
+    Contributor = 1
+}
+
+export interface TrustUser {
+    id: string;
+    role: TrustUserRole;
+    allowedRepos: string[];
+    createdAt: number;
+}

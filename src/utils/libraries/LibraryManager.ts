@@ -35,8 +35,6 @@ class LibraryManager {
         repos[repository.name] = repository;
         StorageService.saveRepos(repos);
 
-        if (repository.trustLevel >= TrustLevel.Trust) return;
-
         if (!LibraryManager.isVersionAllowed(repository, tag)) throw new Error(`Acceso denegado: El tag ${tag} no está en la lista blanca para ${repository.name}`);
  
         await LibraryManager.downloadAndProcessPackage(repository.name, tag, releaseData.zipball_url);
