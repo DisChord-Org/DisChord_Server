@@ -42,6 +42,7 @@ class LibraryManager {
         const tag = await GitHubService.getLatestTag(repository.githubUrl);
         const releaseData = await GitHubService.fetchGitHubRelease(repository.githubUrl, tag);
 
+        if (!repository.versions) repository.versions = {};
         repos[repository.name] = repository;
         StorageService.saveRepos(repos);
 

@@ -39,11 +39,12 @@ class GitHubService {
      * @private
      */
     public static async fetchGitHubRelease (githubUrl: RepositoryData['githubUrl'], version: string = 'latest'): Promise<any> {
-        const apiUrl = `https://api.github.com/repos/${githubUrl}/releases/${version}`;
+        const versionPath = version === 'latest'? 'latest' : `tags/${version}`;
+        const apiUrl = `https://api.github.com/repos/${githubUrl}/releases/${versionPath}`;
         const response = await fetch(apiUrl, {
             headers: {
                 'User-Agent': 'DisChord-Server',
-                'Authorization': `token ${process.env.GITHUB_TOKEN}`
+                'Authorization': `token ${process.env.GITHUB_LIBRARIES_TOKEN}`
             }
         });
 
