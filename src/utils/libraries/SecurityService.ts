@@ -30,7 +30,7 @@ export class SecurityService {
 
         try {
             execSync(
-                `gpg --batch --yes --local-user ${this.GPG_IDENTITY} --detach-sign --armor "${filePath}"`,
+                `gpg --batch --yes --local-user ${this.GPG_IDENTITY} --digest-algo SHA256 --set-filename "" --detach-sign --armor "${filePath}"`,
                 { stdio: 'pipe' }
             );
         } catch (error: any) {
