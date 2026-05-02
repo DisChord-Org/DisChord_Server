@@ -68,10 +68,6 @@ export const downloadPackage = async (req: Request, res: Response) => {
     const tag = await LibraryManager.getVersion(repo);
     if (!tag) return res.status(404).json({ error: 'No version available' });
 
-    if (pkg.trustLevel >= TrustLevel.Trust) {
-        return res.redirect(`https://github.com/${pkg.githubUrl}/archive/refs/tags/${tag}.zip`);
-    } 
-
     const zipPath = StorageService.getZipPath(pkg.name, tag);
     if (!zipPath) return res.status(404).json({ error: 'Physical ZIP file not found on server' });
 
