@@ -10,7 +10,6 @@ interface PackageResponse {
     trustLevel: RepositoryData['trustLevel'];
     repository: RepositoryData['githubUrl'];
     version: string;
-    signature?: string;
     isAudited: boolean;
 }
 
@@ -23,13 +22,15 @@ export const getPackages = async (_req: Request, res: Response) => {
 
     const packagesList = await Promise.all(repoKeys.map(async (name): Promise<PackageResponse | null> => {
         const pkg = repositories[name];
+        const tag = await LibraryManager.getVersion(pkg.name);
 
         return {
             name: pkg.name,
             description: pkg.description,
             trustLevel: pkg.trustLevel,
             repository: pkg.githubUrl,
-            version: await LibraryManager.getVersion(pkg.name)
+            version: tag,
+            isAudited: tag? pkg.versions[tag]?.isAudited ?? false : false
         } as PackageResponse;
     }));
 
@@ -47,7 +48,6 @@ export const getPackage = async (req: Request, res: Response) => {
 
     const tag = await LibraryManager.getVersion(pkg.name);
     if (!tag) return res.status(404).json({ error: 'No version available' });
-    const version = tag? pkg.versions[tag] : null;
 
     return res.json({
         name: pkg.name,
@@ -55,8 +55,7 @@ export const getPackage = async (req: Request, res: Response) => {
         trustLevel: pkg.trustLevel,
         repository: pkg.githubUrl,
         version: tag,
-        signature: version?.signature,
-        isAudited: version?.isAudited ?? false
+        isAudited: tag? pkg.versions[tag]?.isAudited ?? false : false
     } as PackageResponse);
 };
 
