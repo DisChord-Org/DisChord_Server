@@ -78,21 +78,9 @@ class LibraryManager {
             createdAt: Date.now()
         };
 
-        switch (repository.trustLevel) {
-            case TrustLevel.Official:
-                SecurityService.signFile(zipPath);
-                versionInfo.signature = SecurityService.getSignatureContent(zipPath) || undefined;
-                versionInfo.isAudited = true;
-
-                StorageService.removePackageZip(repoName, tag);
-                break;
-            case TrustLevel.Unknown:
-                SecurityService.signFile(zipPath);
-                versionInfo.signature = SecurityService.getSignatureContent(zipPath) || undefined;
-                versionInfo.isAudited = true;
-                break;
-            default:
-                break;
+        if (repository.trustLevel != TrustLevel.Trust) {
+            SecurityService.signFile(zipPath);
+            versionInfo.isAudited = true;
         }
 
         repository.versions[tag] = versionInfo;
@@ -190,7 +178,6 @@ class LibraryManager {
 
         const version = repository.versions[tag];
         if (version) {
-            version.signature = SecurityService.getSignatureContent(zipPath) || undefined;
             version.isAudited = true;
             LibraryManager.updateRepositoryMetadata(repository);
         }

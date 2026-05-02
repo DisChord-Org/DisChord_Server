@@ -12,7 +12,6 @@ export enum TrustLevel {
 
 export interface PackageVersion {
     tag: string;
-    signature?: string;
     isAudited: boolean;
     downloadUrl: string;
     createdAt: number;
