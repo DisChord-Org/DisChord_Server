@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 
 import LibraryManager from '../../utils/libraries/LibraryManager';
-import { RepositoryData, TrustLevel } from '../../utils/libraries/types';
+import { RepositoryData } from '../../utils/libraries/types';
 import StorageService from '../../utils/libraries/StorageService';
 
 interface PackageResponse {
@@ -72,4 +72,19 @@ export const downloadPackage = async (req: Request, res: Response) => {
     if (!zipPath) return res.status(404).json({ error: 'Physical ZIP file not found on server' });
 
     return res.download(zipPath, `${pkg.name}-${tag}.zip`);
+};
+
+export const downloadPackageSign = async (req: Request, res: Response) => {
+    const { repo } = req.params as pkgName;
+    const pkg = StorageService.getRepo(repo);
+    
+    if (!pkg) return res.status(404).json({ error: 'Package not found in registry' });
+
+    const tag = await LibraryManager.getVersion(repo);
+    if (!tag) return res.status(404).json({ error: 'No version available' });
+
+    const zipPath = StorageService.getZipPath(pkg.name, tag);
+    if (!zipPath) return res.status(404).json({ error: 'Physical ZIP file not found on server' });
+
+    return res.download(`${zipPath}.asc`, `${pkg.name}-${tag}.zip.asc`);
 };

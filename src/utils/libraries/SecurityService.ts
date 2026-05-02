@@ -73,6 +73,7 @@ export class SecurityService {
      * * @param {string} filePath - Path to the file to hash.
      * @returns {string} The hex-encoded SHA-256 hash string.
      * @throws {Error} If the file cannot be read.
+     * @deprecated
      */
     public static getFileHash(filePath: string): string {
         const fileBuffer = fs.readFileSync(filePath);
