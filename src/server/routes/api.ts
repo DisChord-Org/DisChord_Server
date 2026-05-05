@@ -10,7 +10,6 @@ const router = Router();
 router.get('/versions', VersionController.getVersions);
 
 /** Download routes */
-router.get('/download/:component/:version', DownloadController.redirectToOS);
 router.get('/download/:component/:version/:os', DownloadController.downloadComponent);
 
 /** Internal routes */
@@ -22,7 +21,7 @@ router.get('/ide/update/:platform/:version', DownloadController.checkIdeUpdate);
 /** Package routes */
 router.get('/packages', PackageController.getPackages);
 router.get('/packages/:repo', PackageController.getPackage);
-router.get('/packages/:repo/download', PackageController.downloadPackage);
-router.get('/packages/:repo/sign/download', PackageController.downloadPackageSign);
+router.get('/packages/:repo/:version/download', PackageController.downloadPackage);
+router.get('/packages/:repo/:version/sign/download', PackageController.downloadPackageSign);
 
 export default router;
