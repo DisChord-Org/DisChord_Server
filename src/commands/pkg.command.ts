@@ -2,7 +2,7 @@ import { Middlewares, Declare, Command, type CommandContext, IgnoreCommand } fro
 import LibraryManager from '../utils/libraries/LibraryManager';
 import StorageService from '../utils/libraries/StorageService';
 import { RepositoryData, TrustLevel } from '../utils/libraries/types';
-import GitHubService from 'src/utils/libraries/GitHubService';
+import GitHubService from '../utils/libraries/GitHubService';
 import semver from 'semver';
 
 @Declare({
