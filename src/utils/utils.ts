@@ -18,15 +18,3 @@ export function getComponentFileName(component: 'cli' | 'ide' | 'compiler', vers
 
     return `${prefix}_${version}_amd64.deb`;
 }
-
-export function isNewer(latest: string, current: string): boolean {
-    const parse = (v: string) => v.replace(/^v/, '').split('.').map(Number);
-    const [lMajor, lMinor, lPatch] = parse(latest);
-    const [cMajor, cMinor, cPatch] = parse(current);
-
-    if (lMajor > cMajor) return true;
-    if (lMajor < cMajor) return false;
-    if (lMinor > cMinor) return true;
-    if (lMinor < cMinor) return false;
-    return lPatch > cPatch;
-}

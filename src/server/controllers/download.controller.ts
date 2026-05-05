@@ -1,27 +1,7 @@
 import { Request, Response } from 'express';
+import semver from 'semver';
 import Version from '../../utils/version-instance';
 import { getComponentFileName } from '../../utils/utils';
-import { isNewer } from '../../utils/utils';
-
-export const redirectToOS = (req: Request, res: Response) => {
-    const { component, version } = req.params;
-    const userAgent = req.headers['user-agent'] || '';
-
-    let os: 'windows' | 'linux' | 'macos' = 'linux';
-    
-    if (req.query.os) {
-        const queryOS = String(req.query.os).toLowerCase();
-        if (['windows', 'linux', 'macos'].includes(queryOS)) {
-            os = queryOS as 'windows' | 'linux' | 'macos';
-        }
-    } else {
-        const ua = userAgent.toLowerCase();
-        if (ua.includes('win')) os = 'windows';
-        else if (ua.includes('mac')) os = 'macos';
-    }
-    
-    return res.redirect(`/download/${component}/${version}/${os}`);
-};
 
 export const downloadComponent = (req: Request, res: Response) => {
     const component = req.params.component as string;
@@ -47,15 +27,25 @@ export const downloadComponent = (req: Request, res: Response) => {
 };
 
 export const checkIdeUpdate = async (req: Request, res: Response) => {
-    const version = req.params.version as string;
-    
+    const { version } = req.params;
+
+    if (!version || typeof version != 'string' || !semver.valid(version)) {
+        return res.status(400).json({ error: 'Versión actual inválida o no proporcionada' });
+    }
+
     try {
         const githubUrl = 'https://github.com/DisChord-Org/DisChord-Code-Studio/releases/latest/download/latest.json';
         const response = await fetch(githubUrl);
+        
         if (!response.ok) return res.status(204).send();
 
         const remoteConfig = await response.json();
-        if (isNewer(remoteConfig.version, version)) {
+
+        if (!remoteConfig.version || !semver.valid(remoteConfig.version)) {
+            return res.status(204).send();
+        }
+
+        if (semver.gt(remoteConfig.version, version)) {
             return res.json(remoteConfig);
         }
 
