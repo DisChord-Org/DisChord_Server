@@ -168,12 +168,12 @@ class LibraryManager {
      * @throws {Error} If files are missing or the level is not Trust.
      * @throws {Error} If GPG signing fails.
      */
-    public static async auditAndSignTrust(repoName: string, tag: string): Promise<void> {
+    public static async auditAndSign(repoName: string, tag: string): Promise<void> {
         const repository = StorageService.getRepo(repoName);
         const zipPath = StorageService.getZipPath(repoName, tag);
 
         if (!repository || !zipPath) throw new Error("Paquete o archivo ZIP no encontrado.");
-        if (repository.trustLevel !== TrustLevel.Trust) throw new Error("Solo se pueden auditar manualmente paquetes de nivel Trust.");
+        if (repository.trustLevel < TrustLevel.Trust) throw new Error("Solo se pueden auditar manualmente paquetes de nivel Trust.");
 
         SecurityService.signFile(zipPath);
 

@@ -2,6 +2,8 @@ import { Middlewares, Declare, Command, type CommandContext, IgnoreCommand } fro
 import LibraryManager from '../utils/libraries/LibraryManager';
 import StorageService from '../utils/libraries/StorageService';
 import { RepositoryData, TrustLevel } from '../utils/libraries/types';
+import GitHubService from 'src/utils/libraries/GitHubService';
+import semver from 'semver';
 
 @Declare({
     name: "pkg",
@@ -12,7 +14,7 @@ import { RepositoryData, TrustLevel } from '../utils/libraries/types';
 @Middlewares([ 'staff' ])
 
 export default class PackageCommand extends Command {
-    private content: string[] = ['# Introduzca comandos para la gestión de paquetes', 'stp (stop) | cls (clear) | add | lst (list) [pkg] | del (delete) | md (modify) | illw (is-allowed)\nllw (allow-with-download) | gv (get-version) | sg (sign)'];
+    private content: string[] = ['# Introduzca comandos para la gestión de paquetes', 'stp (stop) | cls (clear) | add | lst (list) [pkg] | del (delete) | md (modify) | illw (is-allowed)\nllw (allow-with-download) | gv (get-version) | sg (sign) | up (update)'];
 
     private addContent (args: string[], message: string, addEndIndicator: boolean = true): string {
         if (this.content.length >= 12) this.content.splice(2, 1);
@@ -248,13 +250,45 @@ export default class PackageCommand extends Command {
                         }
 
                         try {
-                            LibraryManager.auditAndSignTrust(signRepoName, versionRepoSg);
+                            LibraryManager.auditAndSign(signRepoName, versionRepoSg);
                         } catch (error) {
                             message.edit({ content: this.addContent(args, `Error al firmar el paquete:\n    ${(error as Error).message}`) });
                             return;
                         }
 
                         message.edit({ content: this.addContent(args, `Se ha firmado el paquete.`) });
+                        return;
+                    case 'update':
+                    case 'up':
+                        if (args.length < 2) {
+                            message.edit({ content: this.addContent(args, 'Modo de uso:\nup <pkg>') });
+                            return;
+                        }
+
+                        const updaterRepoName = args[1];
+                        const updaterRepo = StorageService.getRepo(updaterRepoName);
+                        if (!updaterRepo) {
+                            message.edit({ content: this.addContent(args, `El repositorio '${updaterRepoName}' no existe.`) });
+                            return;
+                        }
+
+                        const updaterGitHubVersion = await GitHubService.getLatestTag(updaterRepo.githubUrl, true);
+                        const updaterLocalVersion = await LibraryManager.getVersion(updaterRepoName);
+
+                        if (!updaterLocalVersion) {
+                            message.edit({ content: this.addContent(args, `No hay una versión descargada para el repositorio '${updaterRepoName}'.`) });
+                            return;
+                        }
+
+                        if (semver.eq(updaterGitHubVersion, updaterLocalVersion)) {
+                            message.edit({ content: this.addContent(args, `No hay nuevas releases.`) });
+                            return;
+                        }
+
+                        await LibraryManager.registerAndDownload(updaterRepo);
+                        await LibraryManager.auditAndSign(updaterRepoName, updaterGitHubVersion);
+
+                        message.edit({ content: this.addContent(args, `${updaterRepoName}@${updaterLocalVersion} -> ${updaterRepoName}@${updaterGitHubVersion} (latest)`) });
                         return;
                     case 'clear':
                     case 'cls':
