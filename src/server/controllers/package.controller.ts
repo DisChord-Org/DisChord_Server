@@ -12,7 +12,7 @@ interface PackageResponse {
     repository: RepositoryData['githubUrl'];
     version: PackageVersion['tag'];
     isAudited: PackageVersion['isAudited'];
-    versions?: RepositoryData['versions'];
+    versions: RepositoryData['versions'];
 }
 
 type PackagesRecordResponse = Record<PackageResponse['name'], PackageResponse>;
@@ -32,7 +32,8 @@ export const getPackages = async (_req: Request, res: Response) => {
             trustLevel: pkg.trustLevel,
             repository: pkg.githubUrl,
             version: tag,
-            isAudited: tag? pkg.versions[tag]?.isAudited ?? false : false
+            isAudited: tag? pkg.versions[tag]?.isAudited ?? false : false,
+            versions: pkg.versions
         } as PackageResponse;
     }));
 
