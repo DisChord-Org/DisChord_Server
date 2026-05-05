@@ -1,7 +1,7 @@
 import path from "path";
 import fs from "fs";
 
-import { RepositoryData, RepositoryDataFromJSON } from "./types";
+import { PackageVersion, RepositoryData, RepositoryDataFromJSON } from "./types";
 
 /**
  * Handles exclusively physical storage operations: JSON registry management,
@@ -69,7 +69,7 @@ class StorageService {
      * @param {string} repoName - The name of the repository to scan.
      * @returns {string[]} An array of folder names (tags) found on disk.
      */
-    public static getLocalVersionFolders(repoName: string): string[] {
+    public static getLocalVersionFolders(repoName: RepositoryData['name']): PackageVersion['tag'][] {
         const repoDir = path.join(StorageService.DownloadedReposDir, repoName);
         if (!fs.existsSync(repoDir)) return [];
 
@@ -85,7 +85,7 @@ class StorageService {
      * @param {string} tag - Version tag.
      * @param {Buffer} buffer - The binary content of the ZIP file.
      */
-    public static savePackageFiles(repoName: string, tag: string, buffer: Buffer): void {
+    public static savePackageFiles(repoName: RepositoryData['name'], tag: PackageVersion['tag'], buffer: Buffer): void {
         const versionDir = path.join(StorageService.DownloadedReposDir, repoName, tag);
         if (!fs.existsSync(versionDir)) fs.mkdirSync(versionDir, { recursive: true });
 
@@ -100,7 +100,7 @@ class StorageService {
      * @param {string} version - Specific version tag.
      * @returns {string | null} The full path to the ZIP file or null if the file is missing.
      */
-    public static getZipPath(repoName: string, version: string): string | null {
+    public static getZipPath(repoName: RepositoryData['name'], version: PackageVersion['tag']): string | null {
         const zipPath = path.join(StorageService.DownloadedReposDir, repoName, version, `${repoName}-${version}.zip`);
         return fs.existsSync(zipPath) ? zipPath : null;
     }
@@ -110,7 +110,7 @@ class StorageService {
      * Warning: This action is irreversible and deletes all versions and their files.
      * @param {string} repoName - The name of the repository to remove.
      */
-    public static removeRepoDirectory(repoName: string): void {
+    public static removeRepoDirectory(repoName: RepositoryData['name']): void {
         const repoDir = path.join(StorageService.DownloadedReposDir, repoName);
         if (fs.existsSync(repoDir)) fs.rmSync(repoDir, { recursive: true, force: true });
     }
@@ -121,7 +121,7 @@ class StorageService {
      * @param {string} repoName - Name of the repository.
      * @param {string} tag - Version tag to target.
      */
-    public static removePackageZip(repoName: string, tag: string): void {
+    public static removePackageZip(repoName: RepositoryData['name'], tag: PackageVersion['tag']): void {
         const zipPath = StorageService.getZipPath(repoName, tag);
         if (zipPath) fs.unlinkSync(zipPath);
     }

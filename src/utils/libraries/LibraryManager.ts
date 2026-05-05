@@ -88,22 +88,23 @@ class LibraryManager {
     }
 
     /**
-     * Resolves the current version for a repository.
-     * Uses GitHub API (with cache) for Official/Trust, or the highest semver 
-     * version available on disk for Unknown.
-     * * @param {RepositoryData['name']} repoName - The repository name to check.
-     * @returns {Promise<string | null>} The version tag or null if not found.
+     * Resolves the current version for a specific repository based on local storage.
+     * @param {RepositoryData['name']} repoName - The name of the repository to check.
+     * @param {PackageVersion['tag']} [version] - (Optional) Specific version tag to search for.
+     * @returns {Promise<PackageVersion['tag'] | null>} The resolved version tag or null if the repository or folders are not found.
      */
-    public static async getVersion(repoName: RepositoryData['name']): Promise<string | null> {
+    public static async getVersion(repoName: RepositoryData['name'], version?: PackageVersion['tag']): Promise<PackageVersion['tag'] | null> {
         const repository = StorageService.getRepo(repoName);
         if (!repository) return null;
 
-        if (repository.trustLevel >= TrustLevel.Trust) {
-            return await GitHubService.getLatestTag(repository.githubUrl);
-        }
-
         const folders = StorageService.getLocalVersionFolders(repoName);
         if (folders.length === 0) return null;
+
+        if (version) {
+            const tag = folders.find((tag: PackageVersion['tag']) => semver.eq(version, tag));
+
+            return tag || null;
+        }
 
         return folders.sort(semver.compare).reverse()[0];
     }

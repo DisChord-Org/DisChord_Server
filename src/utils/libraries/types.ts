@@ -17,11 +17,13 @@ export interface PackageVersion {
     createdAt: number;
 }
 
+type BaseRepositoryRecord = Record<string, PackageVersion>;
+
 interface BaseRepository {
     name: string;
     description: string;
     githubUrl: string;
-    versions: Record<string, PackageVersion>;
+    versions: BaseRepositoryRecord;
 }
 
 interface OfficialRepository extends BaseRepository {

@@ -20,7 +20,7 @@ router.get('/ide/update/:platform/:version', DownloadController.checkIdeUpdate);
 
 /** Package routes */
 router.get('/packages', PackageController.getPackages);
-router.get('/packages/:repo', PackageController.getPackage);
+router.get('/packages/:repo/:version', PackageController.getPackage);
 router.get('/packages/:repo/:version/download', PackageController.downloadPackage);
 router.get('/packages/:repo/:version/sign/download', PackageController.downloadPackageSign);
 
