@@ -8,6 +8,7 @@ const router = Router();
 
 /** Versions routes */
 router.get('/versions', VersionController.getVersions);
+router.post('/versions/update', VersionController.updateVersions);
 
 /** Download routes */
 router.get('/download/:component/:version/:os', DownloadController.downloadComponent);

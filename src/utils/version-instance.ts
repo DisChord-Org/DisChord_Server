@@ -7,10 +7,10 @@ class Version {
     public static ide: string = '';
 
     constructor () {
-        this.updateVersions();
+        Version.refresh().catch(err => console.error('Error al actualizar versiones:', err));
     }
 
-    private async fetchLatestVersion (repo: 'DisChord' | 'DisChordCLI' | 'DisChord-Code-Studio'): Promise<string> {
+    private static async fetchLatestVersion (repo: 'DisChord' | 'DisChordCLI' | 'DisChord-Code-Studio'): Promise<string> {
         const url = `https://api.github.com/repos/DisChord-Org/${repo}/releases/latest`;
 
         const headers: HeadersInit = {
@@ -27,11 +27,20 @@ class Version {
         return data.tag_name;
     }
 
-    private async updateVersions() {
+    public static async refresh() {
         Version.server = `v${pkg.version}`;
-        Version.compiler = await this.fetchLatestVersion('DisChord');
-        Version.cli = await this.fetchLatestVersion('DisChordCLI');
-        Version.ide = await this.fetchLatestVersion('DisChord-Code-Studio');
+        Version.compiler = await Version.fetchLatestVersion('DisChord');
+        Version.cli = await Version.fetchLatestVersion('DisChordCLI');
+        Version.ide = await Version.fetchLatestVersion('DisChord-Code-Studio');
+    }
+
+    public static toJSON() {
+        return {
+            server: Version.server,
+            compiler: Version.compiler,
+            cli: Version.cli,
+            ide: Version.ide
+        };
     }
 }
 
