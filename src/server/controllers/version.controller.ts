@@ -8,7 +8,7 @@ export const getVersions = (_req: Request, res: Response) => {
 };
 
 export const updateVersions = async (req: Request, res: Response) => {
-    const expected = process.env.VERSION_UPDATE_SECRET;
+    const expected = process.env.INTERNAL_SECRET;
     const secret = req.body?.secret;
 
     if (!expected || typeof secret !== 'string') return res.status(403).send('Forbidden');

@@ -1,0 +1,31 @@
+name: "Publish Server Release"
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "DisChord Server Release ${{ github.ref_name }}"
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify Server
+        env:
+          INTERNAL_SECRET: ${{ secrets.INTERNAL_SECRET }}
+        run: |
+          curl --fail-with-body -sS -X POST https://api.theindiebrand.es/versions/update \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg secret "$INTERNAL_SECRET" '{secret: $secret}')"
