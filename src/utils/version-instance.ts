@@ -10,7 +10,7 @@ class Version {
         Version.refresh().catch(err => console.error('Error al actualizar versiones:', err));
     }
 
-    private static async fetchLatestVersion (repo: 'DisChord' | 'DisChordCLI' | 'DisChord-Code-Studio'): Promise<string> {
+    public static async fetchLatestVersion (repo: 'DisChord' | 'DisChordCLI' | 'DisChord-Code-Studio' | 'DisChord_Server'): Promise<string> {
         const url = `https://api.github.com/repos/DisChord-Org/${repo}/releases/latest`;
 
         const headers: HeadersInit = {
