@@ -22,6 +22,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Debug Secret Length
+        env:
+          INTERNAL_SECRET: ${{ secrets.INTERNAL_SECRET }}
+        run: echo "len=${#INTERNAL_SECRET}"
+
       - name: Notify Server
         env:
           INTERNAL_SECRET: ${{ secrets.INTERNAL_SECRET }}
