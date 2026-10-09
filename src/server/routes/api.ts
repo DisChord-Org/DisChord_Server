@@ -3,12 +3,13 @@ import * as VersionController from '../controllers/version.controller';
 import * as DownloadController from '../controllers/download.controller';
 import * as InternalController from '../controllers/internal.controller';
 import * as PackageController from '../controllers/package.controller';
+import { updateRateLimit } from '../middlewares/ratelimit.middleware';
 
 const router = Router();
 
 /** Versions routes */
 router.get('/versions', VersionController.getVersions);
-router.post('/versions/update', VersionController.updateVersions);
+router.post('/versions/update', updateRateLimit, VersionController.updateVersions);
 
 /** Download routes */
 router.get('/download/:component/:version/:os', DownloadController.downloadComponent);

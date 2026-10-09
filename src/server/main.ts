@@ -5,7 +5,8 @@ import apiRouter from './routes/api';
 const app = express();
 const PORT = runtime === 'dev' ? 3000 : 45350;
 
-app.use(express.json());
+app.set('trust proxy', 1);
+app.use(express.json({ limit: '10kb' }));
 app.use('/', apiRouter); 
 
 app.listen(PORT, () => {
