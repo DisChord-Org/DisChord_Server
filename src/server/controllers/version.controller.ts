@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { timingSafeEqual } from 'crypto';
 import { spawn } from 'child_process';
 import path from 'path';
+import semver from 'semver';
 import Version from '../../utils/version-instance';
 import client from '../../index';
 
@@ -29,7 +30,7 @@ export const updateVersions = async (req: Request, res: Response) => {
             .map(([key, newValue]) => `**${key}:** \`${oldVersions[key as keyof typeof oldVersions]}\` → \`${newValue}\``);
 
         const latestServerVersion = await Version.fetchLatestVersion('DisChord_Server');
-        const deploying = latestServerVersion !== Version.server;
+        const deploying = !!semver.valid(latestServerVersion) && !!semver.valid(Version.server) && semver.gt(latestServerVersion, Version.server);
         if (deploying) changes.push(`**server:** \`${Version.server}\` → \`${latestServerVersion}\``);
 
         await client.messages.write('1031279210687385640', {
@@ -41,14 +42,17 @@ export const updateVersions = async (req: Request, res: Response) => {
         if (deploying) {
             await client.messages.write('1031279210687385640', {
                 content: `-# Reiniciando servidor para actualizar a la versión \`${latestServerVersion}\`...`,
-            });
+            }).catch(err => console.error('Error al avisar del reinicio:', err));
 
             const script = path.resolve(__dirname, '../../../scripts/restart_script.sh');
-            setTimeout(() => spawn('bash', [ script ], { detached: true, stdio: 'ignore' }).unref(), 1000);
+            setTimeout(() => spawn('bash', [ script, latestServerVersion ], { detached: true, stdio: 'ignore' }).unref(), 1000);
         }
+        
         return;
+
     } catch (err) {
         console.error('Error al actualizar versiones:', err);
+        if (res.headersSent) return;
         return res.status(500).send('Error al actualizar versiones');
     }
 };
