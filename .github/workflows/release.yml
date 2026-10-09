@@ -22,10 +22,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Notify Server
-        env:
-          INTERNAL_SECRET: ${{ secrets.INTERNAL_SECRET }}
-        run: |
-          curl --fail-with-body -sS -X POST https://api.theindiebrand.es/versions/update \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n --arg secret "$INTERNAL_SECRET" '{secret: $secret}')"
+  notify-server:
+    needs: publish-release
+    uses: DisChord-Org/.github/.github/workflows/notify_server.yml@v1.1
+    secrets: inherit
