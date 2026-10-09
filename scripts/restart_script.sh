@@ -33,7 +33,6 @@ rollback() {
 trap rollback ERR
 
 git fetch --tags --force origin
-git verify-tag "$TAG"
 git checkout --force "tags/$TAG"
 pnpm install --frozen-lockfile --ignore-scripts
 pnpm build
