@@ -1,15 +1,22 @@
-import { Middlewares, Declare, Command, type CommandContext, IgnoreCommand } from 'seyfert';
-import LibraryManager from '../utils/libraries/LibraryManager';
-import StorageService from '../utils/libraries/StorageService';
-import { RepositoryData, TrustLevel } from '../utils/libraries/types';
-import GitHubService from '../utils/libraries/GitHubService';
-import semver from 'semver';
+import { Middlewares, Declare, Options, Command, type CommandContext, IgnoreCommand, createStringOption } from 'seyfert';
+import { findPkgHandler, UserError } from '../utils/pkg/handlers';
+import { openPkgPanel } from '../utils/pkg/panel';
+
+const options = {
+    modo: createStringOption({
+        description: 'Usa "text" para la terminal clásica de comandos',
+        required: false,
+        choices: [ { name: 'text', value: 'text' } ] as const
+    })
+} as const;
 
 @Declare({
     name: "pkg",
     description: "Gestiona los paquetes del servidor",
     ignore: IgnoreCommand.Slash
 })
+
+@Options(options)
 
 @Middlewares([ 'staff' ])
 
@@ -29,7 +36,14 @@ export default class PackageCommand extends Command {
         return content;
     }
 
-    async run(ctx: CommandContext) {
+    async run(ctx: CommandContext<typeof options>) {
+        if (ctx.options.modo === 'text') return this.runTerminal(ctx);
+
+        return openPkgPanel(ctx);
+    }
+
+    /** The classic terminal-style interface, kept as an escape route behind `.pkg text`. */
+    private async runTerminal(ctx: CommandContext<typeof options>) {
         const message = await ctx.write({ content: this.getContent() }, true);
         
         ctx.client.collectors.create({
@@ -42,254 +56,6 @@ export default class PackageCommand extends Command {
                 arg.delete();
 
                 switch (command) {
-                    case 'add':
-                        if (args.length === 0 || args.length < 4) {
-                            message.edit({ content: this.addContent(args, 'Modo de uso:\nadd <pkg>\n    < official (o) | trust (t) | unknown (u) >\n    <repository>\n    <description>') });
-                            return;
-                        }
-
-                        const name = args[1];
-                        const description = args.slice(4).join(' ');
-                        const githubUrl = args[3];
-                        let trustLevel;
-                        switch (args[2].toLowerCase()) {
-                            case 'official':
-                            case 'o':
-                                trustLevel = TrustLevel.Official;
-                                break;
-                            case 'trust':
-                            case 't':
-                                trustLevel = TrustLevel.Trust;
-                                break;
-                            case 'unknown':
-                            case 'u':
-                                trustLevel = TrustLevel.Unknown;
-                                break;
-                            default:
-                                trustLevel = TrustLevel.Unknown;
-                        }
-
-                        try {
-                            await LibraryManager.registerAndDownload({
-                                name,
-                                description,
-                                trustLevel,
-                                githubUrl,
-                                ...(trustLevel === TrustLevel.Unknown 
-                                    ? { allowedVersions: [] as string[] } 
-                                    : {})
-                            } as RepositoryData);
-                        } catch (error) {
-                            message.edit({ content: this.addContent(args, `Error al registrar el repositorio:\n    ${(error as Error).message}`) });
-                            return;
-                        }
-
-                        message.edit({ content: this.addContent(args, `Repositorio '${name}' registrado exitosamente con nivel de confianza '${TrustLevel[trustLevel]}'.`) });
-                        return;
-                    case 'list':
-                    case 'lst':
-                        const repos = StorageService.getRepos();
-                        const repoList = Object.values(repos).filter(repo => !args[1] || repo.name === args[1] || repo.name.startsWith(args[1]) || repo.description.startsWith(args[1])).map(repo => `${repo.name} (${TrustLevel[repo.trustLevel]})\n    - ${repo.githubUrl}\n    - ${repo.description}`).join('\n');
-
-                        message.edit({ content: this.addContent(args, repoList) });
-                        return;
-                    case 'delete':
-                    case 'del':
-                        if (args.length < 2) {
-                            message.edit({ content: this.addContent(args, 'Modo de uso:\ndel <pkg>') });
-                            return;
-                        }
-
-                        const repoName = args[1];
-                        if (!StorageService.getRepo(repoName)) {
-                            message.edit({ content: this.addContent(args, `El repositorio '${repoName}' no existe.`) });
-                            return;
-                        }
-                        
-                        LibraryManager.deleteRepository(repoName)
-
-                        message.edit({ content: this.addContent(args, `Repositorio '${repoName}' eliminado exitosamente.`) });
-                        return;
-                    case 'modify':
-                    case 'md':
-                        if (args.length === 0 || args.length < 4) {
-                            message.edit({ content: this.addContent(args, 'Modo de uso:\nmd <pkg>\n    < official (o) | trust (t) | unknown (u) | - >\n    <repository | - >\n    < description | - >') });
-                            return;
-                        }
-
-                        const modifiedName = args[1];
-                        const repo = StorageService.getRepo(modifiedName);
-                        if (!repo) {
-                            message.edit({ content: this.addContent(args, `El repositorio '${modifiedName}' no existe.`) });
-                            return;
-                        }
-
-                        const modifiedDescription = args[4] === '-'? repo.description : args.slice(4).join(' ');
-                        const modifiedGithubUrl = args[3] === '-'? repo.githubUrl : args[3];
-                        let modifiedTrustLevel = args[2] === '-'? repo.trustLevel : undefined;
-                        switch (args[2].toLowerCase()) {
-                            case 'official':
-                            case 'o':
-                                modifiedTrustLevel = TrustLevel.Official;
-                                break;
-                            case 'trust':
-                            case 't':
-                                modifiedTrustLevel = TrustLevel.Trust;
-                                break;
-                            case 'unknown':
-                            case 'u':
-                                modifiedTrustLevel = TrustLevel.Unknown;
-                                break;
-                            default:
-                                modifiedTrustLevel = TrustLevel.Unknown;
-                        }
-
-                        try {
-                            LibraryManager.updateRepositoryMetadata({
-                                name: modifiedName,
-                                description: modifiedDescription,
-                                trustLevel: modifiedTrustLevel,
-                                githubUrl: modifiedGithubUrl,
-                                ...(modifiedTrustLevel === TrustLevel.Unknown 
-                                    ? { allowedVersions: [] as string[] } 
-                                    : {})
-                            } as RepositoryData);
-                        } catch (error) {
-                            message.edit({ content: this.addContent(args, `Error al modificar el repositorio:\n    ${(error as Error).message}`) });
-                            return;
-                        }
-
-                        message.edit({ content: this.addContent(args, `Repositorio '${modifiedName}' modificado exitosamente.`) });
-                        return;
-                    case 'is-allowed':
-                    case 'illw':
-                        if (args.length < 3) {
-                            message.edit({ content: this.addContent(args, 'Modo de uso:\nillw <pkg> <version>') });
-                            return;
-                        }
-
-                        const checkRepoName = args[1];
-                        const checkVersion = args[2];
-                        const checkRepo = StorageService.getRepo(checkRepoName);
-
-                        if (!checkRepo) {
-                            message.edit({ content: this.addContent(args, `El repositorio '${checkRepoName}' no existe.`) });
-                            return;
-                        }
-
-                        const isAllowed = LibraryManager.isVersionAllowed(checkRepo, checkVersion);
-
-                        message.edit({ content: this.addContent(args, `'${checkRepoName} ${checkVersion}' ${isAllowed ? 'está' : 'NO está'} permitido.`) });
-                        return;
-                    case 'allow-with-download':
-                    case 'llw':
-                        if (args.length < 3) {
-                            message.edit({ content: this.addContent(args, 'Modo de uso:\nllw <pkg> <version>') });
-                            return;
-                        }
-
-                        const allowRepoName = args[1];
-                        const allowVersion = args[2];
-                        const allowRepo = StorageService.getRepo(allowRepoName);
-
-                        if (!allowRepo) {
-                            message.edit({ content: this.addContent(args, `El repositorio '${allowRepoName}' no existe.`) });
-                            return;
-                        }
-
-                        if (allowRepo.trustLevel != TrustLevel.Unknown) {
-                            message.edit({ content: this.addContent(args, `El repositorio '${allowRepoName}' deber ser de confianza desconocida.`) });
-                            return;
-                        }
-
-                        try {
-                            await LibraryManager.allowAndDownloadVersion(allowRepoName, allowVersion);
-                        } catch (error) {
-                            message.edit({ content: this.addContent(args, `Error al permitir y descargar la versión '${allowVersion}' del repositorio '${allowRepoName}':\n    ${(error as Error).message}`) });
-                            return;
-                        }
-
-                        message.edit({ content: this.addContent(args, `Versión '${allowVersion}' del repositorio '${allowRepoName}' permitida y descargada exitosamente.`) });
-                        return;
-                    case 'get-version':
-                    case 'gv':
-                        if (args.length < 2) {
-                            message.edit({ content: this.addContent(args, 'Modo de uso:\ngv <pkg>') });
-                            return;
-                        }
-
-                        const versionRepoName = args[1];
-                        const versionRepo = StorageService.getRepo(versionRepoName);
-                        if (!versionRepo) {
-                            message.edit({ content: this.addContent(args, `El repositorio '${versionRepoName}' no existe.`) });
-                            return;
-                        }
-
-                        const localVersion = await LibraryManager.getVersion(versionRepoName);
-
-                        if (!localVersion) {
-                            message.edit({ content: this.addContent(args, `No hay una versión descargada para el repositorio '${versionRepoName}'.`) });
-                            return;
-                        }
-
-                        message.edit({ content: this.addContent(args, `'${versionRepoName} ${localVersion}' (latest)`) });
-                        return;
-                    case 'sign':
-                    case 'sg':
-                        if (args.length < 3) {
-                            message.edit({ content: this.addContent(args, 'Modo de uso:\nsg <pkg> <version>') });
-                            return;
-                        }
-
-                        const signRepoName = args[1];
-                        const versionRepoSg = args[2];
-
-                        if (!signRepoName) {
-                            message.edit({ content: this.addContent(args, `El repositorio '${signRepoName}' no existe.`) });
-                            return;
-                        }
-
-                        try {
-                            LibraryManager.auditAndSign(signRepoName, versionRepoSg);
-                        } catch (error) {
-                            message.edit({ content: this.addContent(args, `Error al firmar el paquete:\n    ${(error as Error).message}`) });
-                            return;
-                        }
-
-                        message.edit({ content: this.addContent(args, `Se ha firmado el paquete.`) });
-                        return;
-                    case 'update':
-                    case 'up':
-                        if (args.length < 2) {
-                            message.edit({ content: this.addContent(args, 'Modo de uso:\nup <pkg>') });
-                            return;
-                        }
-
-                        const updaterRepoName = args[1];
-                        const updaterRepo = StorageService.getRepo(updaterRepoName);
-                        if (!updaterRepo) {
-                            message.edit({ content: this.addContent(args, `El repositorio '${updaterRepoName}' no existe.`) });
-                            return;
-                        }
-
-                        const updaterGitHubVersion = await GitHubService.getLatestTag(updaterRepo.githubUrl, true);
-                        const updaterLocalVersion = await LibraryManager.getVersion(updaterRepoName);
-
-                        if (!updaterLocalVersion) {
-                            message.edit({ content: this.addContent(args, `No hay una versión descargada para el repositorio '${updaterRepoName}'.`) });
-                            return;
-                        }
-
-                        if (semver.eq(updaterGitHubVersion, updaterLocalVersion)) {
-                            message.edit({ content: this.addContent(args, `No hay nuevas releases.`) });
-                            return;
-                        }
-
-                        await LibraryManager.registerAndDownload(updaterRepo);
-                        await LibraryManager.auditAndSign(updaterRepoName, updaterGitHubVersion);
-
-                        message.edit({ content: this.addContent(args, `${updaterRepoName}@${updaterLocalVersion} -> ${updaterRepoName}@${updaterGitHubVersion} (latest)`) });
-                        return;
                     case 'clear':
                     case 'cls':
                         this.content.splice(2, this.content.length - 2);
@@ -299,6 +65,22 @@ export default class PackageCommand extends Command {
                     case 'stp':
                         stop();
                         return;
+                }
+
+                const handler = findPkgHandler(command);
+                if (handler) {
+                    if (args.length < handler.minArgs) {
+                        message.edit({ content: this.addContent(args, handler.usage) });
+                        return;
+                    }
+
+                    try {
+                        message.edit({ content: this.addContent(args, await handler.run(args)) });
+                    } catch (error) {
+                        if (!(error instanceof UserError)) console.error(error);
+                        message.edit({ content: this.addContent(args, error instanceof UserError ? error.message : `Error inesperado:\n    ${(error as Error).message}`) });
+                    }
+                    return;
                 }
 
                 message.edit({ content: this.addContent(args, 'Comando no encontrado.') });

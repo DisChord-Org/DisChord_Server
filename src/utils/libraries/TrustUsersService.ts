@@ -16,6 +16,20 @@ class TrustUsersService {
      */
     public static readonly UsersDir: string = path.join(StorageService.ReposBaseDir, 'Users');
 
+    /** User ids are Discord snowflakes; they become file names, so nothing else is accepted. */
+    public static isValidId (id: unknown): id is string {
+        return typeof id === 'string' && /^\d{1,25}$/.test(id);
+    }
+
+    /** Writes a profile through a temporary file so a crash never leaves it half written. */
+    private static writeUser (user: TrustUser): void {
+        const userPath = path.join(this.UsersDir, `${user.id}.json`);
+        const tmpPath = `${userPath}.tmp`;
+
+        fs.writeFileSync(tmpPath, JSON.stringify(user, null, 4));
+        fs.renameSync(tmpPath, userPath);
+    }
+
     constructor() {
         this.initStructure();
     }
@@ -38,10 +52,12 @@ class TrustUsersService {
      * @returns {void}
      */
     public static addUser (user: TrustUser): void {
+        if (!TrustUsersService.isValidId(user.id)) throw new Error(`El id '${user.id}' no es válido.`);
+
         const userPath = path.join(this.UsersDir, `${user.id}.json`);
         if (fs.existsSync(userPath)) throw new Error(`El usuario ${user.id} ya existe.`);
 
-        fs.writeFileSync(userPath, JSON.stringify(user, null, 4));
+        TrustUsersService.writeUser(user);
     }
 
     /**
@@ -50,6 +66,8 @@ class TrustUsersService {
      * @returns {void}
      */
     public static removeUser (id: TrustUser['id']): void {
+        if (!TrustUsersService.isValidId(id)) return;
+
         const userPath = path.join(this.UsersDir, `${id}.json`);
         if (fs.existsSync(userPath)) {
             fs.unlinkSync(userPath);
@@ -62,6 +80,8 @@ class TrustUsersService {
      * @returns {TrustUser | null} The user data object or null if the user is not found.
      */
     public static getUser (id: TrustUser['id']): TrustUser | null {
+        if (!TrustUsersService.isValidId(id)) return null;
+
         const userPath = path.join(this.UsersDir, `${id}.json`);
         if (!fs.existsSync(userPath)) return null;
 
@@ -76,7 +96,7 @@ class TrustUsersService {
     public static getUsers (): TrustUser[] {
         const users: TrustUser[] = [];
 
-        for (const file of fs.readdirSync(this.UsersDir)) {
+        for (const file of fs.readdirSync(this.UsersDir).filter(name => name.endsWith('.json'))) {
             const fileContent = fs.readFileSync(path.join(this.UsersDir, file), 'utf-8');
 
             users.push(JSON.parse(fileContent));
@@ -136,8 +156,7 @@ class TrustUsersService {
         if (user.allowedRepos.includes(repository)) throw new Error(`El usuario ${id} ya tiene agregado ese repositorio.`);
         user.allowedRepos.push(repository);
 
-        TrustUsersService.removeUser(id);
-        TrustUsersService.addUser(user);
+        TrustUsersService.writeUser(user);
     }
 }
 

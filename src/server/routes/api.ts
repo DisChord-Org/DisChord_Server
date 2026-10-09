@@ -3,6 +3,7 @@ import * as VersionController from '../controllers/version.controller';
 import * as DownloadController from '../controllers/download.controller';
 import * as InternalController from '../controllers/internal.controller';
 import * as PackageController from '../controllers/package.controller';
+import { resolvePackage } from '../middlewares/package.middleware';
 import { updateRateLimit } from '../middlewares/ratelimit.middleware';
 
 const router = Router();
@@ -22,8 +23,8 @@ router.get('/ide/update/:platform/:version', DownloadController.checkIdeUpdate);
 
 /** Package routes */
 router.get('/packages', PackageController.getPackages);
-router.get('/packages/:repo/:version', PackageController.getPackage);
-router.get('/packages/:repo/:version/download', PackageController.downloadPackage);
-router.get('/packages/:repo/:version/sign/download', PackageController.downloadPackageSign);
+router.get('/packages/:repo/:version', resolvePackage(), PackageController.getPackage);
+router.get('/packages/:repo/:version/download', resolvePackage('Package not found in registry'), PackageController.downloadPackage);
+router.get('/packages/:repo/:version/sign/download', resolvePackage('Package not found in registry'), PackageController.downloadPackageSign);
 
 export default router;

@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import fs from 'fs';
 import crypto from 'crypto';
 
@@ -11,11 +11,13 @@ import crypto from 'crypto';
 export class SecurityService {
     /**
      * The GPG Key Identity (Fingerprint or Email) used for signing.
-     * Loaded from the GPG_IDENTITY environment variable.
+     * Read from the GPG_IDENTITY environment variable at call time.
      * @private
      * @static
      */
-    private static readonly GPG_IDENTITY = process.env.GPG_IDENTITY;
+    private static get GPG_IDENTITY(): string | undefined {
+        return process.env.GPG_IDENTITY;
+    }
 
     /**
      * Creates a detached ASCII-armored signature for a file using GPG.
@@ -27,10 +29,12 @@ export class SecurityService {
      */
     public static signFile(filePath: string): void {
         if (!fs.existsSync(filePath)) throw new Error("File to sign not found");
+        if (!this.GPG_IDENTITY) throw new Error("GPG_IDENTITY is not configured");
 
         try {
-            execSync(
-                `gpg --batch --yes --local-user ${this.GPG_IDENTITY} --digest-algo SHA256 --set-filename "" --detach-sign --armor "${filePath}"`,
+            execFileSync(
+                'gpg',
+                [ '--batch', '--yes', '--local-user', this.GPG_IDENTITY, '--digest-algo', 'SHA256', '--set-filename', '', '--detach-sign', '--armor', filePath ],
                 { stdio: 'pipe' }
             );
         } catch (error: any) {
@@ -49,7 +53,7 @@ export class SecurityService {
         if (!fs.existsSync(filePath) || !fs.existsSync(signaturePath)) return false;
 
         try {
-            execSync(`gpg --batch --verify "${signaturePath}" "${filePath}"`, { stdio: 'pipe' });
+            execFileSync('gpg', [ '--batch', '--verify', signaturePath, filePath ], { stdio: 'pipe' });
             return true;
         } catch (error) {
             return false;

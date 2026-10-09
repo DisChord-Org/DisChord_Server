@@ -11,7 +11,7 @@ import { PackageVersion, RepositoryData, RepositoryDataFromJSON } from "./types"
  */
 class StorageService {
     /** Base directory for all repository-related data. */
-    public static ReposBaseDir: string = path.join(process.cwd(), 'Repositories');
+    public static ReposBaseDir: string = process.env.DISCHORD_REPOS_DIR ?? path.join(process.cwd(), 'Repositories');
     /** Path to the JSON file containing the registry of available repositories. */
     public static AvailableReposPath: string = path.join(this.ReposBaseDir, 'AvailableRepos.json');
     /** Directory where the physical library files (ZIPs) are stored. */
@@ -19,6 +19,19 @@ class StorageService {
 
     constructor () {
         this.initStructure();
+    }
+
+    /**
+     * Guards every name that ends up inside a file system path (repository names and tags).
+     * @param {string} segment - Repository name or version tag.
+     * @returns {string} The same value if it is a safe single path segment.
+     * @throws {Error} If it could escape the storage directory (separators, `..`, empty, ...).
+     */
+    public static assertSafeSegment(segment: string): string {
+        if (typeof segment !== 'string' || segment === '' || segment === '.' || segment === '..' || /[\/\\\0]/.test(segment)) {
+            throw new Error(`Nombre no válido para el almacenamiento: '${segment}'`);
+        }
+        return segment;
     }
 
     /**
@@ -61,7 +74,23 @@ class StorageService {
      * @param {RepositoryDataFromJSON} repos - The complete set of repository data to persist.
      */
     public static saveRepos(repos: RepositoryDataFromJSON): void {
-        fs.writeFileSync(StorageService.AvailableReposPath, JSON.stringify(repos, null, 4));
+        // Written to a temporary file and renamed so a crash can never leave a half-written registry.
+        const tmpPath = `${StorageService.AvailableReposPath}.tmp`;
+        fs.writeFileSync(tmpPath, JSON.stringify(repos, null, 4));
+        fs.renameSync(tmpPath, StorageService.AvailableReposPath);
+    }
+
+    /**
+     * Read-modify-write over the registry in a single synchronous step, so changes made
+     * elsewhere while the caller was awaiting something (downloads, API calls) are never overwritten.
+     * @param {(repos: RepositoryDataFromJSON) => T} mutate - Receives the freshly read registry and mutates it in place.
+     * @returns {T} Whatever the mutator returns.
+     */
+    public static updateRepos<T = void>(mutate: (repos: RepositoryDataFromJSON) => T): T {
+        const repos = StorageService.getRepos();
+        const result = mutate(repos);
+        StorageService.saveRepos(repos);
+        return result;
     }
 
     /**
@@ -70,7 +99,7 @@ class StorageService {
      * @returns {string[]} An array of folder names (tags) found on disk.
      */
     public static getLocalVersionFolders(repoName: RepositoryData['name']): PackageVersion['tag'][] {
-        const repoDir = path.join(StorageService.DownloadedReposDir, repoName);
+        const repoDir = path.join(StorageService.DownloadedReposDir, StorageService.assertSafeSegment(repoName));
         if (!fs.existsSync(repoDir)) return [];
 
         return fs.readdirSync(repoDir).filter(file =>
@@ -86,7 +115,7 @@ class StorageService {
      * @param {Buffer} buffer - The binary content of the ZIP file.
      */
     public static savePackageFiles(repoName: RepositoryData['name'], tag: PackageVersion['tag'], buffer: Buffer): void {
-        const versionDir = path.join(StorageService.DownloadedReposDir, repoName, tag);
+        const versionDir = path.join(StorageService.DownloadedReposDir, StorageService.assertSafeSegment(repoName), StorageService.assertSafeSegment(tag));
         if (!fs.existsSync(versionDir)) fs.mkdirSync(versionDir, { recursive: true });
 
         const zipPath = path.join(versionDir, `${repoName}-${tag}.zip`);
@@ -101,8 +130,13 @@ class StorageService {
      * @returns {string | null} The full path to the ZIP file or null if the file is missing.
      */
     public static getZipPath(repoName: RepositoryData['name'], version: PackageVersion['tag']): string | null {
-        const zipPath = path.join(StorageService.DownloadedReposDir, repoName, version, `${repoName}-${version}.zip`);
+        const zipPath = path.join(StorageService.DownloadedReposDir, StorageService.assertSafeSegment(repoName), StorageService.assertSafeSegment(version), `${repoName}-${version}.zip`);
         return fs.existsSync(zipPath) ? zipPath : null;
+    }
+
+    /** @returns {boolean} Whether a file exists at the given absolute path. */
+    public static fileExists(filePath: string): boolean {
+        return fs.existsSync(filePath);
     }
 
     /**
@@ -111,7 +145,7 @@ class StorageService {
      * @param {string} repoName - The name of the repository to remove.
      */
     public static removeRepoDirectory(repoName: RepositoryData['name']): void {
-        const repoDir = path.join(StorageService.DownloadedReposDir, repoName);
+        const repoDir = path.join(StorageService.DownloadedReposDir, StorageService.assertSafeSegment(repoName));
         if (fs.existsSync(repoDir)) fs.rmSync(repoDir, { recursive: true, force: true });
     }
 

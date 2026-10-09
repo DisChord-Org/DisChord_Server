@@ -15,6 +15,8 @@ export interface PackageVersion {
     isAudited: boolean;
     downloadUrl: string;
     createdAt: number;
+    /** ASCII-armored signature, present on registries written by older versions. */
+    signature?: string;
 }
 
 type BaseRepositoryRecord = Record<string, PackageVersion>;
