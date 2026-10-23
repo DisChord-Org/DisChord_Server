@@ -1,7 +1,7 @@
 import { Button, type CommandContext, type ComponentInteraction } from 'seyfert';
 import { ButtonStyle, MessageFlags } from 'seyfert/lib/types/index.js';
 
-import { PaginationButtonId, PaginationSelector, PaginationTexts } from '../pagination';
+import { PaginationButtonId, PaginationSelector } from '../pagination';
 import { TrustPolicy } from '../libraries/TrustPolicy';
 import { RepositoryData, TrustLevel } from '../libraries/types';
 import { answerModal, attempt, ModalWaitMs, PanelTimeoutMs, textValue } from '../panels/helpers';
@@ -30,7 +30,7 @@ export async function openPkgPanel(ctx: CommandContext): Promise<void> {
     await selector.start();
 
     const reload = () => selector.refreshData(sortedRepos());
-    const backButton = () => new Button().setCustomId(PaginationButtonId.Back).setLabel(PaginationTexts.back).setStyle(ButtonStyle.Secondary);
+    const backButton = () => new Button().setCustomId(PaginationButtonId.Back).setEmoji('↩️').setStyle(ButtonStyle.Secondary);
 
     selector.addAction(PkgId.Update, async (interaction: ComponentInteraction, repo) => {
         if (!repo) return;

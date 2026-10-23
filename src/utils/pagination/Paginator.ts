@@ -130,13 +130,13 @@ export class Paginator<T> implements PaginatorNode {
         const { empty, back } = PaginationTexts;
 
         const controls = [
-            new Button().setCustomId(PaginationButtonId.Previous).setLabel('↢').setStyle(ButtonStyle.Primary).setDisabled(disabled || !this.cursor.hasPrevious),
+            new Button().setCustomId(PaginationButtonId.Previous).setEmoji('◀️').setStyle(ButtonStyle.Primary).setDisabled(disabled || !this.cursor.hasPrevious),
             ...this.middleButton(view, disabled),
-            new Button().setCustomId(PaginationButtonId.Next).setLabel('↣').setStyle(ButtonStyle.Primary).setDisabled(disabled || !this.cursor.hasNext)
+            new Button().setCustomId(PaginationButtonId.Next).setEmoji('▶️').setStyle(ButtonStyle.Primary).setDisabled(disabled || !this.cursor.hasNext)
         ];
         const rows = [new ActionRow<Button>().addComponents(controls)];
         if (this.parent) {
-            const button = new Button().setCustomId(PaginationButtonId.Back).setLabel(back).setStyle(ButtonStyle.Secondary).setDisabled(disabled);
+            const button = new Button().setCustomId(PaginationButtonId.Back).setEmoji(back).setStyle(ButtonStyle.Secondary).setDisabled(disabled);
             rows.push(new ActionRow<Button>().addComponents(button));
         }
 
