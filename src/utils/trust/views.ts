@@ -79,14 +79,14 @@ export const contributorInformation = [
 ].join('\n');
 
 export const adminActions = () => [
-    new Button().setCustomId(TrustId.AddUser).setEmoji('➕').setLabel('Usuario').setStyle(ButtonStyle.Success),
-    new Button().setCustomId(TrustId.AllowRepo).setEmoji('📦').setLabel('Permitir').setStyle(ButtonStyle.Secondary),
-    new Button().setCustomId(TrustId.Register).setEmoji('📥').setLabel('Versión').setStyle(ButtonStyle.Secondary),
-    new Button().setCustomId(TrustId.DeleteUser).setEmoji('🗑️').setLabel('Eliminar').setStyle(ButtonStyle.Danger)
+    new Button().setCustomId(TrustId.AddUser).setEmoji('➕').setStyle(ButtonStyle.Success),
+    new Button().setCustomId(TrustId.AllowRepo).setEmoji('📦').setStyle(ButtonStyle.Secondary),
+    new Button().setCustomId(TrustId.Register).setEmoji('📥').setStyle(ButtonStyle.Secondary),
+    new Button().setCustomId(TrustId.DeleteUser).setEmoji('🗑️').setStyle(ButtonStyle.Danger)
 ] as const;
 
 export const contributorActions = () => [
-    new Button().setCustomId(TrustId.Register).setEmoji('📥').setLabel('Registrar versión').setStyle(ButtonStyle.Success),
+    new Button().setCustomId(TrustId.Register).setEmoji('📥').setStyle(ButtonStyle.Success),
     null, null, null
 ] as const;
 
@@ -100,8 +100,8 @@ export function deleteUserConfirmation(user: TrustUser): { embeds: Embed[]; comp
         ],
         components: [
             new ActionRow<Button>().addComponents(
-                new Button().setCustomId(TrustId.DeleteConfirm).setEmoji('🗑️').setLabel('Eliminar').setStyle(ButtonStyle.Danger),
-                new Button().setCustomId(TrustId.DeleteCancel).setLabel('Cancelar').setStyle(ButtonStyle.Secondary)
+                new Button().setCustomId(TrustId.DeleteConfirm).setEmoji('🗑️').setStyle(ButtonStyle.Danger),
+                new Button().setCustomId(TrustId.DeleteCancel).setEmoji('❌').setStyle(ButtonStyle.Secondary)
             )
         ]
     };

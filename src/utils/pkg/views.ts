@@ -100,10 +100,10 @@ export const emptyPanelText = 'No hay paquetes registrados. Usa `.pkg text` y el
 /** The four action buttons of the panel, in the slots {@link PaginationSelector} expects. */
 export function panelActions() {
     return [
-        new Button().setCustomId(PkgId.Update).setEmoji('🔄').setLabel('Actualizar').setStyle(ButtonStyle.Success),
-        new Button().setCustomId(PkgId.Modify).setEmoji('✏️').setLabel('Modificar').setStyle(ButtonStyle.Secondary),
-        new Button().setCustomId(PkgId.Sign).setEmoji('✍️').setLabel('Firmar').setStyle(ButtonStyle.Secondary),
-        new Button().setCustomId(PkgId.More).setEmoji('🧰').setLabel('Más').setStyle(ButtonStyle.Secondary)
+        new Button().setCustomId(PkgId.Update).setEmoji('🔄').setStyle(ButtonStyle.Success),
+        new Button().setCustomId(PkgId.Modify).setEmoji('✏️').setStyle(ButtonStyle.Secondary),
+        new Button().setCustomId(PkgId.Sign).setEmoji('✍️').setStyle(ButtonStyle.Secondary),
+        new Button().setCustomId(PkgId.More).setEmoji('🧰').setStyle(ButtonStyle.Secondary)
     ] as const;
 }
 
@@ -115,9 +115,9 @@ export function moreMenu(repo: RepositoryData, backButton: Button): { embeds: Em
         embeds: [new Embed().setTitle(`Acciones para ${repo.name}`).setColor('Blurple').setDescription(formatDetail(repo))],
         components: [
             new ActionRow<Button>().addComponents(
-                new Button().setCustomId(PkgId.Allow).setEmoji('✅').setLabel('Permitir versión').setStyle(ButtonStyle.Secondary).setDisabled(!isUnknown),
-                new Button().setCustomId(PkgId.Add).setEmoji('➕').setLabel('Añadir paquete').setStyle(ButtonStyle.Secondary),
-                new Button().setCustomId(PkgId.Delete).setEmoji('🗑️').setLabel('Eliminar').setStyle(ButtonStyle.Danger),
+                new Button().setCustomId(PkgId.Allow).setEmoji('✅').setStyle(ButtonStyle.Secondary).setDisabled(!isUnknown),
+                new Button().setCustomId(PkgId.Add).setEmoji('➕').setStyle(ButtonStyle.Secondary),
+                new Button().setCustomId(PkgId.Delete).setEmoji('🗑️').setStyle(ButtonStyle.Danger),
                 backButton
             )
         ]
@@ -134,8 +134,8 @@ export function deleteConfirmation(repo: RepositoryData): { embeds: Embed[]; com
         ],
         components: [
             new ActionRow<Button>().addComponents(
-                new Button().setCustomId(PkgId.DeleteConfirm).setEmoji('🗑️').setLabel('Eliminar').setStyle(ButtonStyle.Danger),
-                new Button().setCustomId(PkgId.DeleteCancel).setLabel('Cancelar').setStyle(ButtonStyle.Secondary)
+                new Button().setCustomId(PkgId.DeleteConfirm).setEmoji('🗑️').setStyle(ButtonStyle.Danger),
+                new Button().setCustomId(PkgId.DeleteCancel).setEmoji('❌').setStyle(ButtonStyle.Secondary)
             )
         ]
     };

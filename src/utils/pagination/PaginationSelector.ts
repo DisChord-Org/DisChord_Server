@@ -267,7 +267,7 @@ export class PaginationSelector<T> {
      * @param interaction The click on "?".
      */
     private async showInformation(interaction: ComponentInteraction): Promise<void> {
-        const back = new Button().setCustomId(PaginationButtonId.Back).setLabel(PaginationTexts.back).setStyle(ButtonStyle.Secondary);
+        const back = new Button().setCustomId(PaginationButtonId.Back).setEmoji('↩️').setStyle(ButtonStyle.Secondary);
 
         await interaction.update({
             embeds: [this.options.embed(this.view).setDescription(this.options.information)],
