@@ -20,7 +20,7 @@ const options = {
 
 export default class PingCommand extends Command {
     async run(ctx: CommandContext<typeof options>) {
-        if (ctx.options.update) new Version();
+        if (ctx.options.update) await Version.refresh();
 
         ctx.write({ content: `# Versiones (latest)\nServidor: \`${Version.server}\`\nCompilador: \`${Version.compiler}\`\nCLI: \`${Version.cli}\`\nIDE: \`${Version.ide}\`` });
     }
