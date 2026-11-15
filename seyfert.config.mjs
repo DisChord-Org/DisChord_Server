@@ -10,7 +10,6 @@ export default config.bot({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildIntegrations,
-        GatewayIntentBits.GuildMembers,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMessages
     ],

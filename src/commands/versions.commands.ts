@@ -18,7 +18,7 @@ const options = {
 
 @Middlewares([ 'staff' ])
 
-export default class PingCommand extends Command {
+export default class VersionsCommand extends Command {
     async run(ctx: CommandContext<typeof options>) {
         if (ctx.options.update) await Version.refresh();
 
