@@ -13,8 +13,8 @@
   "license": "ISC",
   "dependencies": {
     "dotenv": "^17.4.2",
-    "express": "^4.22.1",
-    "express-rate-limit": "^8.7.1",
+    "express": "^4.22.3",
+    "express-rate-limit": "^8.7.4",
     "semver": "^7.7.4",
     "seyfert": "^4.3.0",
     "typescript": "^5.9.3"
