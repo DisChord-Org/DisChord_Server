@@ -1,25 +1,17 @@
 import { Request, Response } from 'express';
-import { timingSafeEqual } from 'crypto';
 import { spawn } from 'child_process';
 import path from 'path';
 import semver from 'semver';
 import Version from '../../utils/version-instance';
-import client from '../../index';
+import client from '../../client';
+import { DiscordIds } from '../../utils/constants';
 
 export const getVersions = (_req: Request, res: Response) => {
     return res.json(Version.toJSON());
 };
 
-export const updateVersions = async (req: Request, res: Response) => {
-    const expected = process.env.INTERNAL_SECRET;
-    const secret = req.body?.secret;
-
-    if (!expected || typeof secret !== 'string') return res.status(403).send('Forbidden');
-
-    const a = Buffer.from(secret);
-    const b = Buffer.from(expected);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) return res.status(403).send('Forbidden');
-
+/** Authentication is done by `requireInternalSecret` before this handler runs. */
+export const updateVersions = async (_req: Request, res: Response) => {
     try {
         const oldVersions = Version.toJSON();
         await Version.refresh();
@@ -33,21 +25,21 @@ export const updateVersions = async (req: Request, res: Response) => {
         const deploying = !!semver.valid(latestServerVersion) && !!semver.valid(Version.server) && semver.gt(latestServerVersion, Version.server);
         if (deploying) changes.push(`**server:** \`${Version.server}\` → \`${latestServerVersion}\``);
 
-        await client.messages.write('1031279210687385640', {
+        await client.messages.write(DiscordIds.LogChannel, {
             content: `**Lista de versiones actualizadas (Petición desde GitHub)**\n${changes.length? changes.join('\n') : 'Sin cambios en las versiones.'}`,
         });
 
         res.json({ deploying });
 
         if (deploying) {
-            await client.messages.write('1031279210687385640', {
+            await client.messages.write(DiscordIds.LogChannel, {
                 content: `-# Reiniciando servidor para actualizar a la versión \`${latestServerVersion}\`...`,
             }).catch(err => console.error('Error al avisar del reinicio:', err));
 
             const script = path.resolve(__dirname, '../../../scripts/restart_script.sh');
             setTimeout(() => spawn('bash', [ script, latestServerVersion ], { detached: true, stdio: 'ignore' }).unref(), 1000);
         }
-        
+
         return;
 
     } catch (err) {

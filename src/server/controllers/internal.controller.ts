@@ -1,19 +1,35 @@
 import { Request, Response } from 'express';
-import client from '../../index';
+import client from '../../client';
+import { DiscordIds } from '../../utils/constants';
 
-export const handleSSHLogin = (req: Request, res: Response) => {
-    const { user, ip, date, secret } = req.body;
+/** Body fields end up inside a Discord message: keep them short and unable to break out of their code span. */
+const field = (value: unknown, max: number = 100): string => {
+    if (typeof value !== 'string' && typeof value !== 'number') return 'desconocido';
 
-    if (secret !== process.env.INTERNAL_SECRET) return res.status(403).send('Forbidden');
+    return String(value).replace(/[`\r\n]/g, ' ').trim().slice(0, max) || 'desconocido';
+};
 
-    client.messages.write('1031279210687385640', {
-        content: `**Acceso SSH**\n**Usuario:** \`${user}\`\n**Fecha:** ${date}`
-    });
+/** Authentication is done by `requireInternalSecret` before this handler runs. */
+export const handleSSHLogin = async (req: Request, res: Response) => {
+    const user = field(req.body?.user);
+    const ip = field(req.body?.ip);
+    const date = field(req.body?.date);
+    const allowed_mentions = { parse: [] };
 
-    client.users.createDM('760769497358794783', true);
-    client.users.write('760769497358794783', {
-        content: `**Acceso SSH**\n**Usuario:** \`${user}\`\n**Fecha:** ${date}\n**IP:** ${ip}`
-    })
+    const results = await Promise.allSettled([
+        client.messages.write(DiscordIds.LogChannel, {
+            content: `**Acceso SSH**\n**Usuario:** \`${user}\`\n**Fecha:** \`${date}\``,
+            allowed_mentions
+        }),
+        client.users.write(DiscordIds.Owner, {
+            content: `**Acceso SSH**\n**Usuario:** \`${user}\`\n**Fecha:** \`${date}\`\n**IP:** \`${ip}\``,
+            allowed_mentions
+        })
+    ]);
+
+    for (const result of results) {
+        if (result.status === 'rejected') console.error('Error al avisar de un acceso SSH:', result.reason);
+    }
 
     return res.status(200).send('OK');
 };
