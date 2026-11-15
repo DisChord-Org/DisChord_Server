@@ -1,12 +1,15 @@
 import type { ModalSubmitInteraction } from 'seyfert';
 import { MessageFlags } from 'seyfert/lib/types/index.js';
 
-import { UserError } from '../pkg/actions';
+import { UserError } from '../errors';
 
 /** How long a panel keeps answering before its buttons are disabled. */
 export const PanelTimeoutMs = 10 * 60 * 1000;
 /** How long Discord waits for a modal to be submitted. */
 export const ModalWaitMs = 5 * 60 * 1000;
+
+/** What the user sees when something fails that they cannot fix; the detail stays in the server log. */
+export const UnexpectedErrorText = 'Error inesperado. Revisa los logs del servidor.';
 
 /** Runs an action and turns its outcome into the text the user sees; unexpected errors are logged, not leaked. */
 export async function attempt(action: () => Promise<string> | string): Promise<string> {
@@ -16,7 +19,7 @@ export async function attempt(action: () => Promise<string> | string): Promise<s
         if (error instanceof UserError) return `⚠️ ${error.message}`;
 
         console.error('Error inesperado en un panel:', error);
-        return `⚠️ Error inesperado: ${(error as Error).message}`;
+        return `⚠️ ${UnexpectedErrorText}`;
     }
 }
 
