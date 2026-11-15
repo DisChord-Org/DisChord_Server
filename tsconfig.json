@@ -4,6 +4,7 @@
     "target": "ESNext",
     "moduleResolution": "node",
     "strict": true,
+    "noEmitOnError": true,
     "esModuleInterop": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
