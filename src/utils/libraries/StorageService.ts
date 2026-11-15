@@ -1,7 +1,14 @@
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 
 import { PackageVersion, RepositoryData, RepositoryDataFromJSON } from "./types";
+
+/** A package written to the staging area, not yet visible as a version. */
+export interface StagedPackage {
+    dir: string;
+    zipPath: string;
+}
 
 /**
  * Handles exclusively physical storage operations: JSON registry management,
@@ -16,6 +23,8 @@ class StorageService {
     public static AvailableReposPath: string = path.join(this.ReposBaseDir, 'AvailableRepos.json');
     /** Directory where the physical library files (ZIPs) are stored. */
     public static DownloadedReposDir: string = path.join(this.ReposBaseDir, 'downloaded');
+    /** Where packages are written and signed before they become a version (same disk, so the final move is a rename). */
+    public static StagingDir: string = path.join(this.ReposBaseDir, '.staging');
 
     constructor () {
         this.initStructure();
@@ -40,7 +49,10 @@ class StorageService {
      * @private
      */
     private initStructure(): void {
-        [ StorageService.ReposBaseDir, StorageService.DownloadedReposDir ].forEach(dir => {
+        // Whatever is still staged belongs to a download that died with the previous process.
+        fs.rmSync(StorageService.StagingDir, { recursive: true, force: true });
+
+        [ StorageService.ReposBaseDir, StorageService.DownloadedReposDir, StorageService.StagingDir ].forEach(dir => {
             if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         });
 
@@ -65,7 +77,9 @@ class StorageService {
      * @returns {RepositoryData | undefined} The repository data or undefined if not registered.
      */
     public static getRepo(name: RepositoryData['name']): RepositoryData | undefined {
-        return StorageService.getRepos()[name];
+        const repos = StorageService.getRepos();
+        // Own keys only: `__proto__` or `constructor` must never resolve to something that looks like a package.
+        return typeof name === 'string' && Object.hasOwn(repos, name) ? repos[name] : undefined;
     }
 
     /**
@@ -83,6 +97,7 @@ class StorageService {
     /**
      * Read-modify-write over the registry in a single synchronous step, so changes made
      * elsewhere while the caller was awaiting something (downloads, API calls) are never overwritten.
+     * The mutator must change the records it is given, never replace them with a copy it read earlier.
      * @param {(repos: RepositoryDataFromJSON) => T} mutate - Receives the freshly read registry and mutates it in place.
      * @returns {T} Whatever the mutator returns.
      */
@@ -107,20 +122,71 @@ class StorageService {
         );
     }
 
+    /** The folder a version lives in: `downloaded/[repo]/[tag]/`. */
+    private static versionDir(repoName: RepositoryData['name'], tag: PackageVersion['tag']): string {
+        return path.join(StorageService.DownloadedReposDir, StorageService.assertSafeSegment(repoName), StorageService.assertSafeSegment(tag));
+    }
+
+    /** @returns {boolean} Whether that version is already stored. Stored versions are never replaced. */
+    public static hasVersion(repoName: RepositoryData['name'], tag: PackageVersion['tag']): boolean {
+        return fs.existsSync(StorageService.versionDir(repoName, tag));
+    }
+
     /**
-     * Persists a package's binary data (ZIP) and its version metadata to the disk.
-     * Creates the directory structure `downloaded/[repo]/[tag]/` if it doesn't exist.
+     * Writes a package to the staging area, where it can be hashed and signed before anybody can see it.
+     * Finish with {@link commitStagedPackage} or {@link discardStagedPackage}.
      * @param {string} repoName - Name of the repository.
      * @param {string} tag - Version tag.
      * @param {Buffer} buffer - The binary content of the ZIP file.
      */
-    public static savePackageFiles(repoName: RepositoryData['name'], tag: PackageVersion['tag'], buffer: Buffer): void {
-        const versionDir = path.join(StorageService.DownloadedReposDir, StorageService.assertSafeSegment(repoName), StorageService.assertSafeSegment(tag));
-        if (!fs.existsSync(versionDir)) fs.mkdirSync(versionDir, { recursive: true });
+    public static stagePackage(repoName: RepositoryData['name'], tag: PackageVersion['tag'], buffer: Buffer): StagedPackage {
+        StorageService.assertSafeSegment(repoName);
+        StorageService.assertSafeSegment(tag);
 
-        const zipPath = path.join(versionDir, `${repoName}-${tag}.zip`);
+        fs.mkdirSync(StorageService.StagingDir, { recursive: true });
+        const dir = fs.mkdtempSync(path.join(StorageService.StagingDir, 'pkg-'));
+        const zipPath = path.join(dir, `${repoName}-${tag}.zip`);
+
         fs.writeFileSync(zipPath, buffer);
-        fs.writeFileSync(path.join(versionDir, 'version.txt'), tag, 'utf-8');
+        fs.writeFileSync(path.join(dir, 'version.txt'), tag, 'utf-8');
+
+        return { dir, zipPath };
+    }
+
+    /**
+     * Turns a staged package into the stored version with a single rename, so a version either
+     * exists complete (ZIP, version.txt and signature if any) or does not exist at all.
+     * @throws {Error} If that version is already stored.
+     */
+    public static commitStagedPackage(staged: StagedPackage, repoName: RepositoryData['name'], tag: PackageVersion['tag']): void {
+        const versionDir = StorageService.versionDir(repoName, tag);
+        if (fs.existsSync(versionDir)) throw new Error(`La versión '${tag}' de '${repoName}' ya está almacenada.`);
+
+        fs.mkdirSync(path.dirname(versionDir), { recursive: true });
+        fs.renameSync(staged.dir, versionDir);
+    }
+
+    public static discardStagedPackage(staged: StagedPackage): void {
+        fs.rmSync(staged.dir, { recursive: true, force: true });
+    }
+
+    /**
+     * Persists a package's binary data (ZIP) and its version metadata to the disk.
+     * Creates the directory structure `downloaded/[repo]/[tag]/` in one atomic step.
+     * @param {string} repoName - Name of the repository.
+     * @param {string} tag - Version tag.
+     * @param {Buffer} buffer - The binary content of the ZIP file.
+     * @throws {Error} If that version is already stored.
+     */
+    public static savePackageFiles(repoName: RepositoryData['name'], tag: PackageVersion['tag'], buffer: Buffer): void {
+        const staged = StorageService.stagePackage(repoName, tag, buffer);
+
+        try {
+            StorageService.commitStagedPackage(staged, repoName, tag);
+        } catch (error) {
+            StorageService.discardStagedPackage(staged);
+            throw error;
+        }
     }
 
     /**
@@ -130,13 +196,18 @@ class StorageService {
      * @returns {string | null} The full path to the ZIP file or null if the file is missing.
      */
     public static getZipPath(repoName: RepositoryData['name'], version: PackageVersion['tag']): string | null {
-        const zipPath = path.join(StorageService.DownloadedReposDir, StorageService.assertSafeSegment(repoName), StorageService.assertSafeSegment(version), `${repoName}-${version}.zip`);
+        const zipPath = path.join(StorageService.versionDir(repoName, version), `${repoName}-${version}.zip`);
         return fs.existsSync(zipPath) ? zipPath : null;
     }
 
     /** @returns {boolean} Whether a file exists at the given absolute path. */
     public static fileExists(filePath: string): boolean {
         return fs.existsSync(filePath);
+    }
+
+    /** @returns {string} The hex-encoded SHA-256 of a file. */
+    public static hashFile(filePath: string): string {
+        return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
     }
 
     /**
@@ -149,15 +220,9 @@ class StorageService {
         if (fs.existsSync(repoDir)) fs.rmSync(repoDir, { recursive: true, force: true });
     }
 
-    /**
-     * Removes only the ZIP file of a specific version while keeping other metadata (like signatures).
-     * Typically used for 'Official' trust level packages to save disk space.
-     * @param {string} repoName - Name of the repository.
-     * @param {string} tag - Version tag to target.
-     */
-    public static removePackageZip(repoName: RepositoryData['name'], tag: PackageVersion['tag']): void {
-        const zipPath = StorageService.getZipPath(repoName, tag);
-        if (zipPath) fs.unlinkSync(zipPath);
+    /** Deletes one stored version. Only used to undo a download whose registry entry could not be written. */
+    public static removeVersionDirectory(repoName: RepositoryData['name'], tag: PackageVersion['tag']): void {
+        fs.rmSync(StorageService.versionDir(repoName, tag), { recursive: true, force: true });
     }
 }
 

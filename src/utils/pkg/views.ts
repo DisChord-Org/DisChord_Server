@@ -65,12 +65,15 @@ export function formatDetail(repo: RepositoryData): string {
     const versions = localVersions(repo.name);
     const latest = versions[0];
     const audited = latest ? repo.versions[latest]?.isAudited ?? false : false;
+    const sha256 = latest ? repo.versions[latest]?.sha256 : undefined;
     const lines = [
         `### ${repo.name}`,
         repo.description || '*Sin descripción*',
         `**Nivel:** ${TrustLevel[repo.trustLevel]} · **Repo:** [${repo.githubUrl}](https://github.com/${repo.githubUrl})`,
         `**Última local:** ${latest ? `\`${latest}\` ${audited ? '(firmada)' : '(sin firmar)'}` : 'ninguna'} · **Descargadas:** ${versions.length}`
     ];
+
+    if (sha256) lines.push(`**SHA-256:** \`${sha256}\``);
 
     if (repo.trustLevel === TrustLevel.Unknown) {
         lines.push(`**Versiones permitidas:** ${repo.allowedVersions.length ? repo.allowedVersions.map(v => `\`${v}\``).join(', ') : 'ninguna'}`);

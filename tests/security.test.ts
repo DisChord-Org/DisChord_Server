@@ -3,14 +3,19 @@ import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const execFileSync = vi.fn();
-vi.mock('child_process', () => ({ execFileSync, execSync: vi.fn() }));
+const execFile = vi.fn();
+vi.mock('child_process', () => ({ execFile, execFileSync: vi.fn(), execSync: vi.fn() }));
+
+/** Makes the fake gpg finish, successfully or with the given error. */
+const gpgAnswers = (error: Error | null = null, stderr: string = '') =>
+    execFile.mockImplementation((_binary: string, _args: string[], _options: unknown, callback: (error: Error | null, stdout: string, stderr: string) => void) => callback(error, '', stderr));
 
 describe('SecurityService', () => {
     let tmp: string;
 
     beforeEach(() => {
-        execFileSync.mockReset();
+        execFile.mockReset();
+        gpgAnswers();
         tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dischord-sec-'));
         process.env.GPG_IDENTITY = 'ABCDEF';
     });
@@ -21,16 +26,19 @@ describe('SecurityService', () => {
 
     it('passes the file as a single argument, never through a shell', async () => {
         const { SecurityService } = await import('../src/utils/libraries/SecurityService');
-        const evil = path.join(tmp, 'x"; touch pwned; ".zip');
+        // Shell metacharacters that are still a legal file name on every platform.
+        const evil = path.join(tmp, 'x; touch pwned; $(id) && echo.zip');
         fs.writeFileSync(evil, '');
 
-        SecurityService.signFile(evil);
+        await SecurityService.signFile(evil);
 
-        const [ binary, args ] = execFileSync.mock.calls[0];
+        const [ binary, args, options ] = execFile.mock.calls[0];
         expect(binary).toBe('gpg');
         expect(args).toContain(evil);
         expect(args).toContain('ABCDEF');
         expect(args.slice(-3)).toEqual([ '--detach-sign', '--armor', evil ]);
+        expect(options.shell).toBeFalsy();
+        expect(options.timeout).toBeGreaterThan(0);
     });
 
     it('fails clearly when GPG_IDENTITY is missing', async () => {
@@ -39,17 +47,24 @@ describe('SecurityService', () => {
         fs.writeFileSync(file, '');
         delete process.env.GPG_IDENTITY;
 
-        expect(() => SecurityService.signFile(file)).toThrow('GPG_IDENTITY');
-        expect(execFileSync).not.toHaveBeenCalled();
+        await expect(SecurityService.signFile(file)).rejects.toThrow('GPG_IDENTITY');
+        expect(execFile).not.toHaveBeenCalled();
     });
 
-    it('wraps gpg failures', async () => {
+    it('wraps gpg failures without leaking their output', async () => {
         const { SecurityService } = await import('../src/utils/libraries/SecurityService');
         const file = path.join(tmp, 'a.zip');
         fs.writeFileSync(file, '');
-        execFileSync.mockImplementation(() => { throw Object.assign(new Error('x'), { stderr: Buffer.from('no key') }); });
+        gpgAnswers(new Error('x'), 'no secret key /home/server/.gnupg');
         vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        expect(() => SecurityService.signFile(file)).toThrow('Failed to sign package with GPG');
+        await expect(SecurityService.signFile(file)).rejects.toThrow(/^Failed to sign package with GPG$/);
+    });
+
+    it('refuses to sign a file that does not exist', async () => {
+        const { SecurityService } = await import('../src/utils/libraries/SecurityService');
+
+        await expect(SecurityService.signFile(path.join(tmp, 'nope.zip'))).rejects.toThrow('not found');
+        expect(execFile).not.toHaveBeenCalled();
     });
 });

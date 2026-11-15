@@ -2,7 +2,8 @@ import LibraryManager from '../libraries/LibraryManager';
 import StorageService from '../libraries/StorageService';
 import TrustUsersService from '../libraries/TrustUsersService';
 import { RepositoryData, TrustUser, TrustUserRole } from '../libraries/types';
-import { UserError } from '../pkg/actions';
+import { AuditLog } from '../libraries/AuditLog';
+import { UserError } from '../errors';
 
 export { UserError };
 
@@ -42,6 +43,7 @@ export function addTrustUser(actorId: string, id: string, role: TrustUserRole): 
         throw new UserError((error as Error).message);
     }
 
+    AuditLog.record('trust.user-added', { actor: actorId, user: id, role: roleLabel(role) });
     return `Usuario ${id} (${role === TrustUserRole.Admin ? 'adm' : 'contrib'}) ha sido agregado.`;
 }
 
@@ -56,6 +58,7 @@ export function removeTrustUser(actorId: string, id: string): string {
     }
 
     TrustUsersService.removeUser(id);
+    AuditLog.record('trust.user-removed', { actor: actorId, user: id });
     return 'Usuario eliminado.';
 }
 
@@ -72,6 +75,7 @@ export function allowRepoToUser(actorId: string, id: string, repoName: string): 
         throw new UserError(`Error al agregar repositorio al usuario:\n    ${(error as Error).message}`);
     }
 
+    AuditLog.record('trust.repo-allowed', { actor: actorId, user: id, package: repoName });
     return `Repositorio ${repoName} agregado a ${id}`;
 }
 
@@ -81,6 +85,8 @@ export async function registerLatestVersion(actorId: string, repoName: string): 
     if (!repo) throw new UserError('No existe el repositorio.');
 
     if (!TrustUsersService.canUserManageRepo(actorId, repo.name)) throw new UserError('No puedes agregar nuevas versiones a ese repositorio.');
+
+    AuditLog.record('trust.register-latest', { actor: actorId, package: repo.name });
 
     try {
         await LibraryManager.registerAndDownload(repo);

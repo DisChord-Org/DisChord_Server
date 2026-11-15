@@ -3,11 +3,11 @@ import semver from 'semver';
 import LibraryManager from '../libraries/LibraryManager';
 import StorageService from '../libraries/StorageService';
 import GitHubService from '../libraries/GitHubService';
-import { TrustPolicy } from '../libraries/TrustPolicy';
 import { RepositoryData, TrustLevel } from '../libraries/types';
+import { isValidGithubRepo, isValidPackageName } from '../libraries/validation';
+import { UserError } from '../errors';
 
-/** Expected failure that must be shown to the user as the action's answer. */
-export class UserError extends Error {}
+export { UserError };
 
 const errorMessage = (error: unknown): string => (error as Error).message;
 
@@ -39,23 +39,34 @@ export interface NewPackage {
 
 /** Registers a package and downloads its latest release when its trust level allows it. */
 export async function addPackage({ name, trustLevel, githubUrl, description }: NewPackage): Promise<string> {
-    try {
-        StorageService.assertSafeSegment(name);
-    } catch (error) {
-        throw new UserError(`Error al registrar el repositorio:\n    ${errorMessage(error)}`);
-    }
+    if (!isValidPackageName(name)) throw new UserError(`Error al registrar el repositorio:\n    Nombre no válido: '${name}'. Usa letras, números, puntos, guiones y guiones bajos (máximo 64).`);
+    if (!isValidGithubRepo(githubUrl)) throw new UserError(`Error al registrar el repositorio:\n    Repositorio no válido: '${githubUrl}'. Usa el formato owner/repo.`);
 
     if (StorageService.getRepo(name)) throw new UserError(`El repositorio '${name}' ya existe. Usa md para modificarlo.`);
 
+    const repository = {
+        name,
+        description,
+        trustLevel,
+        githubUrl,
+        versions: {},
+        ...(trustLevel === TrustLevel.Unknown ? { allowedVersions: [] as string[] } : {})
+    } as RepositoryData;
+
+    if (trustLevel === TrustLevel.Unknown) {
+        try {
+            LibraryManager.register(repository);
+        } catch (error) {
+            throw new UserError(`Error al registrar el repositorio:\n    ${errorMessage(error)}`);
+        }
+
+        return `Repositorio '${name}' registrado con nivel de confianza 'Unknown'. Permite una versión (llw) para descargarla.`;
+    }
+
     try {
-        await LibraryManager.registerAndDownload({
-            name,
-            description,
-            trustLevel,
-            githubUrl,
-            ...(trustLevel === TrustLevel.Unknown ? { allowedVersions: [] as string[] } : {})
-        } as RepositoryData);
+        await LibraryManager.registerAndDownload(repository);
     } catch (error) {
+        if (StorageService.getRepo(name)) throw new UserError(`Repositorio '${name}' registrado, pero no se pudo descargar su última release:\n    ${errorMessage(error)}`);
         throw new UserError(`Error al registrar el repositorio:\n    ${errorMessage(error)}`);
     }
 
@@ -85,14 +96,20 @@ export interface PackageChanges {
 
 /** Changes metadata only; versions and the whitelist are kept (see {@link withTrustLevel}). */
 export function modifyPackage(name: string, changes: PackageChanges): string {
-    const repo = requireRepo(name);
+    requireRepo(name);
 
-    const updated = withTrustLevel(repo, changes.trustLevel ?? repo.trustLevel);
-    updated.githubUrl = changes.githubUrl ?? repo.githubUrl;
-    updated.description = changes.description ?? repo.description;
+    if (changes.githubUrl !== undefined && !isValidGithubRepo(changes.githubUrl)) throw new UserError(`Repositorio no válido: '${changes.githubUrl}'. Usa el formato owner/repo.`);
 
     try {
-        LibraryManager.updateRepositoryMetadata(updated);
+        StorageService.updateRepos(repos => {
+            const current = Object.hasOwn(repos, name) ? repos[name] : undefined;
+            if (!current) throw new Error('Repositorio no encontrado.');
+
+            const updated = withTrustLevel(current, changes.trustLevel ?? current.trustLevel);
+            updated.githubUrl = changes.githubUrl ?? current.githubUrl;
+            updated.description = changes.description ?? current.description;
+            repos[name] = updated;
+        });
     } catch (error) {
         throw new UserError(`Error al modificar el repositorio:\n    ${errorMessage(error)}`);
     }
@@ -142,7 +159,10 @@ export async function signVersion(name: string, version: string): Promise<string
     return 'Se ha firmado el paquete.';
 }
 
-/** Downloads the latest GitHub release when it differs from the newest local version. */
+/**
+ * Downloads the latest GitHub release when it differs from the newest local version.
+ * It never audits: Official packages are signed while downloading, Trust ones wait for `sg`.
+ */
 export async function updatePackage(name: string): Promise<string> {
     const repo = requireRepo(name);
 
@@ -156,10 +176,10 @@ export async function updatePackage(name: string): Promise<string> {
 
     try {
         await LibraryManager.registerAndDownload(repo);
-        if (TrustPolicy.canBeAudited(repo.trustLevel)) await LibraryManager.auditAndSign(name, remoteVersion);
     } catch (error) {
         throw new UserError(`Error al actualizar el paquete:\n    ${errorMessage(error)}`);
     }
 
-    return `${name}@${localVersion} -> ${name}@${remoteVersion} (latest)`;
+    const pending = StorageService.getRepo(name)?.versions?.[remoteVersion]?.isAudited ? '' : '\nPendiente de auditoría: fírmala con sg cuando esté revisada.';
+    return `${name}@${localVersion} -> ${name}@${remoteVersion} (latest)${pending}`;
 }

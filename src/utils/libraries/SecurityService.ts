@@ -1,4 +1,4 @@
-import { execFileSync } from 'child_process';
+import { execFile } from 'child_process';
 import fs from 'fs';
 import crypto from 'crypto';
 
@@ -9,6 +9,9 @@ import crypto from 'crypto';
  * @class SecurityService
  */
 export class SecurityService {
+    /** A gpg that waits for a passphrase nobody will type must not keep a download open forever. */
+    private static readonly GPG_TIMEOUT_MS = 60_000;
+
     /**
      * The GPG Key Identity (Fingerprint or Email) used for signing.
      * Read from the GPG_IDENTITY environment variable at call time.
@@ -20,25 +23,34 @@ export class SecurityService {
     }
 
     /**
+     * Runs gpg without a shell and without blocking the event loop (the bot and the API share it).
+     * @throws The process error, with gpg's stderr attached, if it fails or times out.
+     */
+    private static gpg(args: string[]): Promise<void> {
+        return new Promise((resolve, reject) => {
+            execFile('gpg', args, { timeout: SecurityService.GPG_TIMEOUT_MS }, (error, _stdout, stderr) => {
+                if (error) reject(Object.assign(error, { stderr }));
+                else resolve();
+            });
+        });
+    }
+
+    /**
      * Creates a detached ASCII-armored signature for a file using GPG.
      * Generates a new file with the same name plus a '.asc' extension in the same directory.
      * * @param {string} filePath - Absolute or relative path to the file to be signed.
-     * @returns {void}
+     * @returns {Promise<void>}
      * @throws {Error} If the file does not exist at the provided path.
      * @throws {Error} If the GPG command fails (e.g., identity not found, binary missing).
      */
-    public static signFile(filePath: string): void {
+    public static async signFile(filePath: string): Promise<void> {
         if (!fs.existsSync(filePath)) throw new Error("File to sign not found");
         if (!this.GPG_IDENTITY) throw new Error("GPG_IDENTITY is not configured");
 
         try {
-            execFileSync(
-                'gpg',
-                [ '--batch', '--yes', '--local-user', this.GPG_IDENTITY, '--digest-algo', 'SHA256', '--set-filename', '', '--detach-sign', '--armor', filePath ],
-                { stdio: 'pipe' }
-            );
-        } catch (error: any) {
-            console.error("GPG Signing Error:", error.stderr?.toString());
+            await SecurityService.gpg([ '--batch', '--yes', '--local-user', this.GPG_IDENTITY, '--digest-algo', 'SHA256', '--set-filename', '', '--detach-sign', '--armor', filePath ]);
+        } catch (error) {
+            console.error("GPG Signing Error:", String((error as { stderr?: unknown }).stderr ?? error));
             throw new Error("Failed to sign package with GPG");
         }
     }
@@ -47,40 +59,21 @@ export class SecurityService {
      * Verifies a file's integrity and authenticity against a detached GPG signature.
      * @param {string} filePath - Path to the original file.
      * @param {string} signaturePath - Path to the detached signature file.
-     * @returns {boolean} True if the signature is valid and matches the file, false otherwise.
+     * @returns {Promise<boolean>} True if the signature is valid and matches the file, false otherwise.
      */
-    public static verifySignature(filePath: string, signaturePath: string): boolean {
+    public static async verifySignature(filePath: string, signaturePath: string): Promise<boolean> {
         if (!fs.existsSync(filePath) || !fs.existsSync(signaturePath)) return false;
 
         try {
-            execFileSync('gpg', [ '--batch', '--verify', signaturePath, filePath ], { stdio: 'pipe' });
+            await SecurityService.gpg([ '--batch', '--verify', signaturePath, filePath ]);
             return true;
-        } catch (error) {
+        } catch {
             return false;
         }
     }
 
-    /**
-     * Reads the content of an ASCII-armored signature file from disk.
-     * Assumes the signature file follows the standard naming convention (filename.asc).
-     * * @param {string} filePath - Path to the original signed file.
-     * @returns {string | null} The PGP signature block content, or null if the signature file doesn't exist.
-     */
-    public static getSignatureContent(filePath: string): string | null {
-        const sigPath = `${filePath}.asc`;
-        return fs.existsSync(sigPath) ? fs.readFileSync(sigPath, 'utf-8') : null;
-    }
-
-    /**
-     * Generates a SHA-256 hash of a file's content.
-     * Used for quick integrity checks without GPG overhead.
-     * * @param {string} filePath - Path to the file to hash.
-     * @returns {string} The hex-encoded SHA-256 hash string.
-     * @throws {Error} If the file cannot be read.
-     * @deprecated
-     */
-    public static getFileHash(filePath: string): string {
-        const fileBuffer = fs.readFileSync(filePath);
-        return crypto.createHash('sha256').update(fileBuffer).digest('hex');
+    /** @returns {string} The hex-encoded SHA-256 of some bytes. */
+    public static hash(content: Buffer): string {
+        return crypto.createHash('sha256').update(content).digest('hex');
     }
 }
