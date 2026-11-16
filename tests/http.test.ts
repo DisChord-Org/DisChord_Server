@@ -275,6 +275,33 @@ describe('package routes', () => {
         expect((await get('/packages/ent/v1.0.0/sign/download')).status).toBe(404);
     });
 
+    it('serve the signed manifest of a stored version', async () => {
+        const { get, SecurityService } = await seed();
+        vi.spyOn(SecurityService, 'signFile').mockImplementation(async (file: string) => {
+            fs.writeFileSync(`${file}.asc`, `signature of ${fs.readFileSync(file, 'utf-8')}`);
+        });
+
+        const res = await get('/packages/ent/v1.0.0/manifest');
+        expect(res.status).toBe(200);
+
+        const { manifest, signature } = await res.json() as { manifest: string; signature: string };
+        expect(JSON.parse(manifest)).toEqual({ schema: 1, name: 'ent', version: 'v1.0.0', sha256: SecurityService.hash(Buffer.from('zip-bytes')), trustLevel: 2, isAudited: true });
+        expect(signature).toBe(`signature of ${manifest}`);
+
+        expect((await get('/packages/ent/v9.9.9/manifest')).status).toBe(404);
+        expect((await get('/packages/nope/v1.0.0/manifest')).status).toBe(404);
+    });
+
+    it('answers 503 when the manifest cannot be signed, without leaking the error', async () => {
+        const { get, SecurityService } = await seed();
+        vi.spyOn(SecurityService, 'signFile').mockRejectedValue(new Error('no secret key /home/server/.gnupg'));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const res = await get('/packages/ent/v1.0.0/manifest');
+        expect(res.status).toBe(503);
+        expect(await res.json()).toEqual({ error: 'Signed manifest not available' });
+    });
+
     it('answer 400 or 404 to names and versions that try to leave the registry', async () => {
         const { get } = await seed();
 

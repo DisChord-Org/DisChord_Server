@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 
 import LibraryManager from '../../utils/libraries/LibraryManager';
+import { ManifestService } from '../../utils/libraries/ManifestService';
 import StorageService from '../../utils/libraries/StorageService';
 import { ResolvedPackage } from '../middlewares/package.middleware';
 import { PackageResponse, toPackageResponse } from '../presenters/package.presenter';
@@ -41,4 +42,24 @@ export const downloadPackageSign = (_req: Request, res: Response) => {
     if (!StorageService.fileExists(signaturePath)) return res.status(404).json({ error: 'Signature file not found on server' });
 
     return res.download(signaturePath, `${pkg.name}-${tag}.zip.asc`);
+};
+
+/**
+ * Answers the signed manifest of a stored version: what the registry states about it (name, version,
+ * ZIP hash, trust level and audit status) together with a detached signature over those exact bytes.
+ */
+export const getPackageManifest = async (_req: Request, res: Response) => {
+    const { pkg, tag } = resolved(res);
+
+    let signed;
+    try {
+        signed = await ManifestService.getSigned(pkg.name, tag);
+    } catch (error) {
+        console.error('Error al firmar el manifiesto:', error);
+        return res.status(503).json({ error: 'Signed manifest not available' });
+    }
+
+    if (!signed) return res.status(404).json({ error: 'Physical ZIP file not found on server' });
+
+    return res.json(signed);
 };

@@ -29,5 +29,6 @@ router.get('/packages', asyncHandler(PackageController.getPackages));
 router.get('/packages/:repo/:version', asyncHandler(resolvePackage()), PackageController.getPackage);
 router.get('/packages/:repo/:version/download', asyncHandler(resolvePackage('Package not found in registry')), PackageController.downloadPackage);
 router.get('/packages/:repo/:version/sign/download', asyncHandler(resolvePackage('Package not found in registry')), PackageController.downloadPackageSign);
+router.get('/packages/:repo/:version/manifest', asyncHandler(resolvePackage('Package not found in registry')), asyncHandler(PackageController.getPackageManifest));
 
 export default router;
